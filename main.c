@@ -8,10 +8,24 @@
  * IR_DETECT - 102
  */
 
-#define CS_PIN 89
-#define DATA_IN_PIN 45
-#define CLK_PIN 46
-#define DATA_OUT_PIN 102
+/* Pin connection:
+ * SD  | MX233
+ * 9   | 0
+ * 1   | 1
+ * 2   | 2
+ * 3   | GND
+ * DET | 3
+ * 4   | [power switch]
+ * 5   | 4
+ * 6   | GND
+ * 7   | 7
+ * 8   | NC (was: 6)
+ */
+
+#define CS_PIN 1
+#define DATA_IN_PIN 7
+#define CLK_PIN 4
+#define DATA_OUT_PIN 2
 
 static const unsigned int tran_exp[] = {
         10000,          100000,         1000000,        10000000,
