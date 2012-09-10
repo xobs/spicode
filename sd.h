@@ -12,7 +12,8 @@
 
 struct sd_state;
 
-struct sd_state *sd_init(uint8_t cmd_in, uint8_t cmd_out, uint8_t clk, uint8_t cs);
+struct sd_state *sd_init(uint8_t cmd_in, uint8_t cmd_out, uint8_t clk,
+			 uint8_t cs, uint8_t power);
 void sd_deinit(struct sd_state **state);
 
 int sd_reset(struct sd_state *state);

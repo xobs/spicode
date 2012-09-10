@@ -10,7 +10,7 @@
 
 struct sd_state {
 	/* Pin numbers */
-	uint32_t data_in, data_out, clk, cs;
+	uint32_t data_in, data_out, clk, cs, power;
 };
 
 
@@ -110,20 +110,16 @@ static uint8_t sd_read(struct sd_state *state) {
 /* Read the first byte after a CMD (i.e. with a result not of 0xff) */
 static uint8_t sd_read_first(struct sd_state *state) {
 	uint8_t byte, tries;
-	for (byte=0xff, tries=0; byte&0x80 && tries<10; tries++) {
+	for (byte=0xff, tries=0; byte&0x80 && tries<10; tries++)
 		byte = sd_xfer_byte(state, 0xff);
-		printf("Got byte 0x%02x\n", byte);
-	}
 	return byte;
 }
 
 /* Wait for the "Start-of-Data" token (0xfe) */
 static uint8_t sd_read_first_token(struct sd_state *state) {
 	uint8_t byte, tries;
-	for (byte=0xff, tries=0; byte!=0xfe && tries<10; tries++) {
+	for (byte=0xff, tries=0; byte!=0xfe && tries<10; tries++)
 		byte = sd_xfer_byte(state, 0xff);
-		printf("Got t byte 0x%02x\n", byte);
-	}
 	return byte;
 }
 
@@ -145,7 +141,6 @@ static int sd_read_array(struct sd_state *state, uint8_t *bytes, size_t sz) {
 
 	crc[0] = sd_read(state);
 	crc[1] = sd_read(state);
-	printf("CRC: 0x%02x 0x%02x\n", crc[0], crc[1]);
 	
 	return 0;
 }
@@ -171,9 +166,8 @@ static int sd_send_cmd(struct sd_state *state, uint8_t cmd, uint8_t args[4]) {
 }
 
 struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
-			 uint8_t clk, uint8_t cs) {
+			 uint8_t clk, uint8_t cs, uint8_t power) {
 	struct sd_state *state = malloc(sizeof(struct sd_state));
-	int pulse;
 	if (!state) {
 		perror("Couldn't allocate memory for sd_state");
 		return NULL;
@@ -183,6 +177,7 @@ struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
 	state->data_out = data_out;
 	state->clk = clk;
 	state->cs = cs;
+	state->power = power;
 
 	if (gpio_export(state->data_in)) {
 		perror("Unable to export DATA IN pin");
@@ -218,11 +213,15 @@ struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
 	gpio_set_direction(state->cs, 1);
 	gpio_set_value(state->cs, 1);
 
-	/* Send 80 clock pulses */
-	gpio_set_value(state->cs, 1);
-	for (pulse=0; pulse<80; pulse++)
-		sd_tick(state);
-	gpio_set_value(state->cs, 0);
+	/* Power up the card */
+	if (gpio_export(state->power)) {
+		perror("Unable to export power pin");
+		sd_deinit(&state);
+		return NULL;
+	}
+	gpio_set_direction(state->power, 1);
+	gpio_set_value(state->power, 1);
+
 
 	return state;
 }
@@ -230,11 +229,13 @@ struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
 
 void sd_deinit(struct sd_state **state) {
 	gpio_set_value((*state)->cs, 1);
+	gpio_set_value((*state)->power, 1);
 
 	gpio_unexport((*state)->data_in);
 	gpio_unexport((*state)->data_out);
 	gpio_unexport((*state)->clk);
 	gpio_unexport((*state)->cs);
+	gpio_unexport((*state)->power);
 	free(*state);
 	*state = NULL;
 }
@@ -245,10 +246,23 @@ int sd_reset(struct sd_state *state) {
 	uint8_t args[4];
 	int byte;
 	int tries;
+	int pulse;
 
 	bzero(args, sizeof(args));
 
 	printf("Beginning SD reset...\n");
+	gpio_set_value(state->power, 1);
+	usleep(50000);
+	gpio_set_value(state->power, 0);
+	usleep(50000);
+
+	/* Send 80 clock pulses */
+	gpio_set_value(state->cs, 1);
+	for (pulse=0; pulse<80; pulse++)
+		sd_tick(state);
+	gpio_set_value(state->cs, 0);
+
+
 	sd_send_cmd(state, SD_CMD0, args);
 	byte = sd_read_first(state);
 	printf("Reset SD card tries with result 0x%02x\n", byte);
@@ -277,13 +291,10 @@ int sd_get_csd(struct sd_state *state, uint8_t csd[16]) {
 
 int sd_get_cid(struct sd_state *state, uint8_t cid[16]) {
 	uint8_t args[4];
-	int i;
 	bzero(args, sizeof(args));
 	bzero(cid, sizeof(cid));
 	sd_send_cmd(state, SD_CMD10, args);
-	
 	sd_read_array(state, cid, 16);
-
 	return 0;
 }
 
