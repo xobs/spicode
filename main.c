@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <strings.h>
+#include <string.h>
 #include <ctype.h>
 #include "sd.h"
 
@@ -26,6 +27,7 @@
 #define DATA_IN_PIN 7
 #define CLK_PIN 4
 #define DATA_OUT_PIN 2
+#define POWER_PIN 3
 
 static const unsigned int tran_exp[] = {
         10000,          100000,         1000000,        10000000,
@@ -97,19 +99,53 @@ static void print_csd(uint8_t csd[16]) {
 	printf("    Write partial: %d\n", UNSTUFF_BITS(resp, 21, 1));
 }
 
-static void print_cid(uint8_t cid[16]) {
-	uint32_t *resp = (uint32_t *)cid;
-	printf("    manfid: 0x%02x\n", UNSTUFF_BITS(resp, 120, 8));
-	printf("    oemid: 0x%04x\n", be16toh(UNSTUFF_BITS(resp, 104, 16)));
-	printf("    prod_name[0]: %c\n", UNSTUFF_BITS(resp, 96, 8));
-	printf("    prod_name[1]: %c\n", UNSTUFF_BITS(resp, 88, 8));
-	printf("    prod_name[2]: %c\n", UNSTUFF_BITS(resp, 80, 8));
-	printf("    prod_name[3]: %c\n", UNSTUFF_BITS(resp, 72, 8));
-	printf("    prod_name[4]: %c\n", UNSTUFF_BITS(resp, 64, 8));
-	printf("    prod_name[5]: %c\n", UNSTUFF_BITS(resp, 56, 8));
-	printf("    serial: 0x%08x\n", UNSTUFF_BITS(resp, 16, 32));
-	printf("    month: %d\n", UNSTUFF_BITS(resp, 12, 4));
-	printf("    year: %d\n", UNSTUFF_BITS(resp, 8, 4) + 1997);
+struct sd_cid {
+	uint32_t mid;
+	uint16_t oid;
+	uint8_t name[8];
+	uint8_t hwrev;
+	uint8_t fwrev;
+	uint32_t serial;
+	uint16_t year;
+	uint8_t month;
+	uint8_t chksum;
+};
+
+static void print_cid(void *cid) {
+	uint8_t *data = cid;
+	struct sd_cid sd_cid;
+	bzero(&sd_cid, sizeof(sd_cid));
+
+	sd_cid.mid	= data[0];
+	sd_cid.oid 	= (data[1] << 8) | (data[2]);
+	sd_cid.name[0]	= data[3];
+	sd_cid.name[1]	= data[4];
+	sd_cid.name[2]	= data[5];
+	sd_cid.name[3]	= data[6];
+	sd_cid.name[4]	= data[7];
+	sd_cid.name[5]	= '\0';
+	sd_cid.hwrev	= (data[8]>>4)&0xf;
+	sd_cid.fwrev	= data[8]&0xf;
+	sd_cid.serial	= ((data[9] << 24) | (data[10] << 16)
+			|  (data[11] << 8) | (data[12] << 0));
+	sd_cid.month	= data[14] & 0x0f;
+	sd_cid.year	= ((data[14] & 0xf0)>>4) | ((data[13] & 0x01) << 4);
+
+	sd_cid.year  += 2000; /* SD cards year offset */
+
+	printf("    manfid: 0x%02x\n", sd_cid.mid);
+	printf("    oemid: 0x%04x\n", sd_cid.oid);
+	printf("    prod_name[0]: %c\n", sd_cid.name[0]);
+	printf("    prod_name[1]: %c\n", sd_cid.name[1]);
+	printf("    prod_name[2]: %c\n", sd_cid.name[2]);
+	printf("    prod_name[3]: %c\n", sd_cid.name[3]);
+	printf("    prod_name[4]: %c\n", sd_cid.name[4]);
+	printf("    prod_name: %s\n", sd_cid.name);
+	printf("    hwrev: %x\n", sd_cid.hwrev);
+	printf("    fwrev: %x\n", sd_cid.fwrev);
+	printf("    serial: 0x%08x\n", sd_cid.serial);
+	printf("    month: %d\n", sd_cid.month);
+	printf("    year: %d\n", sd_cid.year);
 }
 
 
@@ -117,10 +153,10 @@ int main(int argc, char **argv) {
 	struct sd_state *state;
 	int i;
 	uint8_t ocr[4];
-	uint8_t cid[16];
 	uint8_t csd[16];
+	uint8_t cid[16];
 	
-	state = sd_init(DATA_IN_PIN, DATA_OUT_PIN, CLK_PIN, CS_PIN);
+	state = sd_init(DATA_IN_PIN, DATA_OUT_PIN, CLK_PIN, CS_PIN, POWER_PIN);
 	if (!state)
 		return 1;
 
@@ -128,15 +164,13 @@ int main(int argc, char **argv) {
 	sd_reset(state);
 
 	/* Read the OCR register */
-	/*
 	sd_get_ocr(state, ocr);
 	printf("OCR:\n");
 	for (i=0; i<sizeof(ocr); i++)
 		printf("    0x%02x %c\n", ocr[i], isprint(ocr[i])?ocr[i]:'.');
-	*/
-
 	//printf("Setting block length: 0x%02x\n", sd_set_blocklength(state, 512));
 
+	bzero(csd, sizeof(csd));
 	if (sd_get_csd(state, csd)) {
 		printf("Unable to get CSD\n");
 	}
@@ -148,14 +182,13 @@ int main(int argc, char **argv) {
 	}
 	
 
+	bzero(cid, sizeof(cid));
 	if (sd_get_cid(state, cid)) {
 		printf("Unable to get CID\n");
 	}
 	else {
 		printf("CID:\n");
 		print_cid(cid);
-		for (i=0; i<sizeof(cid); i++)
-			printf("    0x%02x %c\n", cid[i], isprint(cid[i])?cid[i]:'.');
 	}
 
 
