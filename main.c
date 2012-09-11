@@ -49,32 +49,100 @@ static const unsigned int tacc_mant[] = {
 };
 
 
-#define UNSTUFF_BITS(resp,start,size)                                   \
-        ({                                                              \
-                const int __size = size;                                \
-                const uint32_t __mask = (__size < 32 ? 1 << __size : 0) - 1; \
-                const int __off = 3 - ((start) / 32);                   \
-                const int __shft = (start) & 31;                        \
-                uint32_t __res;                                              \
-                                                                        \
-                __res = resp[__off] >> __shft;                          \
-                if (__size + __shft > 32)                               \
-                        __res |= resp[__off-1] << ((32 - __shft) % 32); \
-                __res & __mask;                                         \
-        })
+struct sd_csd {
+	uint8_t csd_structure:2;
+	uint8_t reserved1:6;
 
-static void print_csd(uint8_t csd[16]) {
-        unsigned int e, m, csd_struct;
-        uint32_t *resp = (uint32_t *)csd;
+	uint8_t taac:8;
+	uint8_t nsac:8;
+	uint8_t tran_speed:8;
+	uint16_t ccc:12;
+
+	uint8_t read_bl_len:4;
+
+	uint8_t read_blk_partial:1;
+	uint8_t write_blk_misalign:1;
+	uint8_t read_blk_misalign:1;
+	uint8_t dsr_imp:1;
+	uint8_t reserved3:2;
+
+	uint16_t c_size:11;
+	uint8_t vdd_r_curr_min:3;
+	uint8_t vdd_r_curr_max:3;
+	uint8_t vdd_w_curr_min:3;
+	uint8_t vdd_w_curr_max:3;
+	uint8_t c_size_mult:3;
+	uint8_t erase_blk_en:1;
+	uint8_t sector_size:7;
+	uint8_t wp_grp_size:7;
+	uint8_t wp_grp_enable:1;
+	uint8_t reserved4:2;
+
+	uint8_t r2w_factor:3;
+	uint8_t write_bl_len:4;
+	uint8_t write_bl_partial:1;
+	uint8_t reserved5:5;
+
+	uint8_t file_format_grp:1;
+	uint8_t copy:1;
+	uint8_t perm_write_protect:1;
+	uint8_t tmp_write_protect:1;
+	uint8_t file_format:2;
+	uint8_t reserved6:2;
+
+	uint8_t crc:7;
+	uint8_t one:1;
+};
+
+static void print_csd(void *csd_data) {
+	struct sd_csd csd_val;
+	struct sd_csd *csd = &csd_val;
+	uint8_t *data = csd_data;
+
+	//csd->c_size = be16toh(csd->c_size);
 
         /*
          * We only understand CSD structure v1.1 and v1.2.
          * v1.2 has extra information in bits 15, 11 and 10.
          */
-        csd_struct = UNSTUFF_BITS(resp, 126, 2);
-        if (csd_struct != 1 && csd_struct != 2)
-		printf("Warning: Unrecognized CSD structure version %d\n", csd_struct);
+        if (csd->csd_structure != 1 && csd->csd_structure != 2)
+		printf("Warning: Unrecognized CSD structure version %d\n", csd->csd_structure);
+	else
+		printf("    CSD structure version %d\n", csd->csd_structure);
 
+	csd->ccc = be16toh((data[4]<<4) | (data[5]>>4));
+	csd->read_bl_len = (data[5]&0xf);
+	csd->read_blk_partial = (data[6]&0x80)>>7;
+	csd->write_blk_misalign = (data[6]&0x40)>>6;
+	csd->read_blk_misalign = (data[6]&0x20)>>5;
+	csd->dsr_imp = (data[6]&0x10)>>4;
+	csd->c_size = ((data[6] & 0x03) << 10)
+		    | ((data[7] & 0xff) << 2)
+		    | ((data[8] & 0xc0) >> 6);
+	csd->vdd_r_curr_min = ((data[8] >> 3) & 0x7);
+	csd->vdd_r_curr_max = ((data[8] & 0x7) >> 0);
+	csd->vdd_w_curr_min = ((data[9] >> 5) & 0x7);
+	csd->vdd_w_curr_max = ((data[9] >> 2) & 0x7);
+	csd->c_size_mult = ((data[9] & 0x3) << 1) | ((data[10] >> 7) & 1);
+	csd->erase_blk_en = ((data[10] >> 6) & 1);
+	csd->sector_size = ((data[10] & 0x3f) << 1) | ((data[11] >> 7) & 1);
+	csd->wp_grp_size = ((data[11] & 0x3f));
+	csd->r2w_factor = ((data[12] >> 2) & 0x7);
+	csd->write_bl_len = ((data[12] & 0x3) << 2) | ((data[13] >> 5) & 0x3);
+	printf("    c_size: %x\n", csd->c_size);
+	printf("    c_size_mult: %d\n", csd->c_size_mult);
+	printf("    write_bl_len: %d\n", 1 << csd->write_bl_len);
+	printf("    read_bl_len: %d\n", 1 << csd->read_bl_len);
+	uint32_t blocknr, block_len, mult;
+	block_len = 1 << csd->read_bl_len;
+	mult = 1<< (csd->c_size_mult+2);
+	blocknr = (csd->c_size+1)*mult;
+	printf("    block_len: %d\n", block_len);
+	printf("    mult: %d\n", mult);
+	printf("    blocknr: %d\n", blocknr);
+	printf("    capacity: %d\n", blocknr * block_len);
+
+/*
         printf("    MMCA version: %d\n", UNSTUFF_BITS(resp, 122, 4));
         m = UNSTUFF_BITS(resp, 115, 4);
         e = UNSTUFF_BITS(resp, 112, 3);
@@ -97,6 +165,7 @@ static void print_csd(uint8_t csd[16]) {
         printf("    r2w_factor: %d\n", UNSTUFF_BITS(resp, 26, 3));
         printf("    write_blkbits: %d\n", UNSTUFF_BITS(resp, 22, 4));
 	printf("    Write partial: %d\n", UNSTUFF_BITS(resp, 21, 1));
+*/
 }
 
 struct sd_cid {
@@ -149,12 +218,24 @@ static void print_cid(void *cid) {
 }
 
 
+static void print_sr(void *sr) {
+	char *data = sr;
+	uint32_t status;
+	memcpy(&status, &data[1], sizeof(status));
+	printf("    Command index: %x\n", data[5]&0x1f);
+	printf("    Status: %x\n", status);
+}
+
+
 int main(int argc, char **argv) {
 	struct sd_state *state;
 	int i;
+	int ret;
 	uint8_t ocr[4];
 	uint8_t csd[16];
 	uint8_t cid[16];
+	uint8_t sr[6];
+	uint8_t block[512];
 	
 	state = sd_init(DATA_IN_PIN, DATA_OUT_PIN, CLK_PIN, CS_PIN, POWER_PIN);
 	if (!state)
@@ -170,8 +251,7 @@ int main(int argc, char **argv) {
 		printf("    0x%02x %c\n", ocr[i], isprint(ocr[i])?ocr[i]:'.');
 	//printf("Setting block length: 0x%02x\n", sd_set_blocklength(state, 512));
 
-	bzero(csd, sizeof(csd));
-	if (sd_get_csd(state, csd)) {
+	if ((ret=sd_get_csd(state, csd))) {
 		printf("Unable to get CSD\n");
 	}
 	else {
@@ -181,14 +261,46 @@ int main(int argc, char **argv) {
 			printf("    0x%02x %c\n", csd[i], isprint(csd[i])?csd[i]:'.');
 	}
 	
-
-	bzero(cid, sizeof(cid));
-	if (sd_get_cid(state, cid)) {
+	if ((ret=sd_get_cid(state, cid))) {
 		printf("Unable to get CID\n");
 	}
 	else {
 		printf("CID:\n");
 		print_cid(cid);
+	}
+
+
+	if ((ret=sd_get_sr(state, sr))) {
+		printf("Unable to get SR: %d\n", ret);
+	}
+	else {
+		printf("SR:\n");
+		print_sr(sr);
+	}
+
+
+	if ((ret = sd_set_blocklength(state, 512)))
+		printf("Unable to set block length: %d\n", ret);
+
+
+
+	if ((ret = sd_read_block(state, 0, block, 1)))
+		printf("Unable to read data: %d\n", ret);
+	else {
+		uint8_t *offset = block;
+		for (i=0; i<sizeof(block); i++) {
+			printf("%02x ", block[i]);
+			if (!((i+1)&0x7))
+				printf(" ");
+			if (!((i+1)&0xf)) {
+				int j;
+				printf("|");
+				for (j=0; j<16; j++)
+					printf("%c", isprint(offset[j])?offset[j]:'.');
+				printf("|\n");
+				offset += 16;
+			}
+		}
 	}
 
 

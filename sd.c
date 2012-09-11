@@ -11,6 +11,7 @@
 struct sd_state {
 	/* Pin numbers */
 	uint32_t data_in, data_out, clk, cs, power;
+	uint32_t blklen;
 };
 
 
@@ -74,9 +75,9 @@ static uint8_t crc7(uint8_t crc, const uint8_t *buffer, size_t len)
 
 static int sd_tick(struct sd_state *state) {
 	gpio_set_value(state->clk, 1);
-	usleep(200);
+	usleep(2);
 	gpio_set_value(state->clk, 0);
-	usleep(200);
+	usleep(2);
 	gpio_set_value(state->clk, 1);
 	return 0;
 }
@@ -276,13 +277,15 @@ int sd_reset(struct sd_state *state) {
 	}
 	printf("Sent CMD1 after %d tries with result 0x%02x\n", tries, byte);
 
+	state->blklen = 512;
+
 	return byte==0;
 }
 
 int sd_get_csd(struct sd_state *state, uint8_t csd[16]) {
 	uint8_t args[4];
 	bzero(args, sizeof(args));
-	bzero(csd, sizeof(csd));
+	bzero(csd, 16);
 	sd_send_cmd(state, SD_CMD9, args);
 	
 	return sd_read_array(state, csd, 16);
@@ -292,19 +295,51 @@ int sd_get_csd(struct sd_state *state, uint8_t csd[16]) {
 int sd_get_cid(struct sd_state *state, uint8_t cid[16]) {
 	uint8_t args[4];
 	bzero(args, sizeof(args));
-	bzero(cid, sizeof(cid));
+	bzero(cid, 16);
 	sd_send_cmd(state, SD_CMD10, args);
 	sd_read_array(state, cid, 16);
 	return 0;
 }
 
+
+int sd_get_sr(struct sd_state *state, uint8_t sr[6]) {
+	uint8_t args[4];
+	bzero(args, sizeof(args));
+	bzero(sr, 6);
+	sd_send_cmd(state, SD_CMD12, args);
+	sd_send_cmd(state, SD_CMD13, args);
+	sr[0] = sd_read(state);
+	sr[1] = sd_read(state);
+	sr[2] = sd_read(state);
+	sr[3] = sd_read(state);
+	sr[4] = sd_read(state);
+	sr[5] = sd_read(state);
+	return 0;
+	return sd_read_array(state, sr, 6);
+}
+
 int sd_set_blocklength(struct sd_state *state, uint32_t blklen) {
 	uint8_t args[4];
 	uint32_t swapped = htobe32(blklen);
+	int ret;
 	memcpy(args, &swapped, sizeof(args));
 	sd_send_cmd(state, SD_CMD16, args);
-	return sd_read_first(state);
+	ret = sd_read_first(state);
+
+	if (!ret)
+		state->blklen = blklen;
+	return ret;
 }
+
+int sd_read_block(struct sd_state *state, uint32_t offset,
+		  void *block, uint32_t count) {
+	uint8_t args[4];
+	uint32_t swapped = htobe32(offset);
+	memcpy(args, &swapped, sizeof(args));
+	sd_send_cmd(state, SD_CMD17, args);
+	return sd_read_array(state, block, state->blklen * count);
+}
+
 
 
 int sd_get_ocr(struct sd_state *state, uint8_t ocr[4]) {

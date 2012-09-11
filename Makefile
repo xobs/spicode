@@ -1,7 +1,7 @@
 SOURCES=gpio.c sd.c main.c
 OBJECTS=$(SOURCES:.c=.o)
 EXEC=spi
-MY_CFLAGS += -Wall -O2 -g
+MY_CFLAGS += -Wall -O0 -g
 MY_LIBS +=
 
 all: $(OBJECTS)
