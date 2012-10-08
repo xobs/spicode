@@ -227,6 +227,14 @@ struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
 	return state;
 }
 
+static int sd_begin(struct sd_state *state) {
+	return gpio_set_value(state->cs, 0);
+}
+
+static int sd_end(struct sd_state *state) {
+	return gpio_set_value(state->cs, 1);
+}
+
 
 void sd_deinit(struct sd_state **state) {
 	gpio_set_value((*state)->cs, 1);
@@ -258,37 +266,43 @@ int sd_reset(struct sd_state *state) {
 	usleep(50000);
 
 	/* Send 80 clock pulses */
-	gpio_set_value(state->cs, 1);
+	sd_end(state);
 	for (pulse=0; pulse<80; pulse++)
 		sd_tick(state);
-	gpio_set_value(state->cs, 0);
 
-
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD0, args);
 	byte = sd_read_first(state);
+	sd_end(state);
 	printf("Reset SD card tries with result 0x%02x\n", byte);
 
 	/* Repeatedly send CMD1 until IDLE is cleared */
 	for (byte=0xff, tries=0; byte!=0 && tries<10; tries++) {
+		sd_begin(state);
 		sd_send_cmd(state, SD_CMD1, args);
 		byte = sd_read_first(state);
+		sd_end(state);
 		printf("Result of CMD1: %d\n", byte);
 		usleep(20000);
 	}
 	printf("Sent CMD1 after %d tries with result 0x%02x\n", tries, byte);
 
 	state->blklen = 512;
+	gpio_set_value(state->cs, 0);
 
 	return byte==0;
 }
 
 int sd_get_csd(struct sd_state *state, uint8_t csd[16]) {
 	uint8_t args[4];
+	int ret;
 	bzero(args, sizeof(args));
 	bzero(csd, 16);
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD9, args);
-	
-	return sd_read_array(state, csd, 16);
+	ret = sd_read_array(state, csd, 16);
+	sd_end(state);
+	return ret;
 }
 
 
@@ -296,16 +310,20 @@ int sd_get_cid(struct sd_state *state, uint8_t cid[16]) {
 	uint8_t args[4];
 	bzero(args, sizeof(args));
 	bzero(cid, 16);
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD10, args);
 	sd_read_array(state, cid, 16);
+	sd_end(state);
 	return 0;
 }
 
 
 int sd_get_sr(struct sd_state *state, uint8_t sr[6]) {
 	uint8_t args[4];
+	int ret;
 	bzero(args, sizeof(args));
 	bzero(sr, 6);
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD12, args);
 	sd_send_cmd(state, SD_CMD13, args);
 	sr[0] = sd_read(state);
@@ -314,8 +332,9 @@ int sd_get_sr(struct sd_state *state, uint8_t sr[6]) {
 	sr[3] = sd_read(state);
 	sr[4] = sd_read(state);
 	sr[5] = sd_read(state);
-	return 0;
-	return sd_read_array(state, sr, 6);
+	ret = sd_read_array(state, sr, 6);
+	sd_end(state);
+	return ret;
 }
 
 int sd_set_blocklength(struct sd_state *state, uint32_t blklen) {
@@ -323,33 +342,42 @@ int sd_set_blocklength(struct sd_state *state, uint32_t blklen) {
 	uint32_t swapped = htobe32(blklen);
 	int ret;
 	memcpy(args, &swapped, sizeof(args));
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD16, args);
 	ret = sd_read_first(state);
 
 	if (!ret)
 		state->blklen = blklen;
+	sd_end(state);
 	return ret;
 }
 
 int sd_read_block(struct sd_state *state, uint32_t offset,
 		  void *block, uint32_t count) {
 	uint8_t args[4];
+	int ret;
 	uint32_t swapped = htobe32(offset);
 	memcpy(args, &swapped, sizeof(args));
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD17, args);
-	return sd_read_array(state, block, state->blklen * count);
+	ret = sd_read_array(state, block, state->blklen * count);
+	sd_end(state);
+	return ret;
 }
 
 
 
 int sd_get_ocr(struct sd_state *state, uint8_t ocr[4]) {
 	uint8_t args[4];
+	int ret;
 	bzero(args, sizeof(args));
 	bzero(ocr, sizeof(ocr));
 
 	args[0] = 0x01;
 	args[1] = 0xaa;
+	sd_begin(state);
 	sd_send_cmd(state, SD_CMD8, args);
-	
-	return sd_read_array(state, ocr, 4);
+	ret = sd_read_array(state, ocr, 4);
+	sd_end(state);
+	return ret;
 }
