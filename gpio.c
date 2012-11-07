@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -38,7 +39,8 @@ static int gpio_export_unexport(char *path, int gpio) {
 	bytes = snprintf(str, sizeof(str)-1, "%d", gpio) + 1;
 
 	if (-1 == write(fd, str, bytes)) {
-		perror("Unable to modify gpio");
+		fprintf(stderr, "Unable to modify gpio%d: %s",
+			gpio, strerror(errno));
 		close(fd);
 		return -errno;
 	}
@@ -109,7 +111,8 @@ int gpio_set_value(int gpio, int value) {
 		ret = write(fd, "0", 2);
 
 	if (ret == -1) {
-		perror("Couldn't set output value");
+		fprintf(stderr, "Couldn't set GPIO %d output value: %s\n",
+			gpio, strerror(errno));
 		close(fd);
 		return -errno;
 	}
