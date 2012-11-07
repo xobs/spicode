@@ -23,11 +23,20 @@
  * 8   | NC (was: 6)
  */
 
+/** Definitions for Falconwing board
 #define CS_PIN 1
 #define DATA_IN_PIN 7
 #define CLK_PIN 4
 #define DATA_OUT_PIN 2
 #define POWER_PIN 3
+*/
+
+/** Definitions for Kovan test jig */
+#define CS_PIN 50
+#define DATA_IN_PIN 62
+#define CLK_PIN 46
+#define DATA_OUT_PIN 48
+#define POWER_PIN 55
 
 static const unsigned int tran_exp[] = {
         10000,          100000,         1000000,        10000000,
