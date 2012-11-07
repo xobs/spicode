@@ -221,7 +221,7 @@ struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
 		return NULL;
 	}
 	gpio_set_direction(state->power, 1);
-	gpio_set_value(state->power, 1);
+	gpio_set_value(state->power, 0);
 
 
 	return state;
@@ -238,7 +238,7 @@ static int sd_end(struct sd_state *state) {
 
 void sd_deinit(struct sd_state **state) {
 	gpio_set_value((*state)->cs, 1);
-	gpio_set_value((*state)->power, 1);
+	gpio_set_value((*state)->power, 0);
 
 	gpio_unexport((*state)->data_in);
 	gpio_unexport((*state)->data_out);
@@ -260,9 +260,9 @@ int sd_reset(struct sd_state *state) {
 	bzero(args, sizeof(args));
 
 	printf("Beginning SD reset...\n");
-	gpio_set_value(state->power, 1);
-	usleep(50000);
 	gpio_set_value(state->power, 0);
+	usleep(50000);
+	gpio_set_value(state->power, 1);
 	usleep(50000);
 
 	/* Send 80 clock pulses */
