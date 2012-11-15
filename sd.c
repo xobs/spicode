@@ -8,6 +8,8 @@
 #include "gpio.h"
 #include "sd.h"
 
+#define R1_ILLEGAL_COMMAND 0x04
+
 struct sd_state {
 	/* Pin numbers */
 	uint32_t data_in, data_out, clk, cs, power;
@@ -149,21 +151,35 @@ static int sd_read_array(struct sd_state *state, uint8_t *bytes, size_t sz) {
 static int sd_send_cmd(struct sd_state *state, uint8_t cmd, uint8_t args[4]) {
 	uint8_t bytes[7];
 	uint8_t byte;
-	bytes[0] = 0xff;
-	bytes[1] = 0x40 | (cmd&0x3f);
-	memcpy(&bytes[2], args, sizeof(args));
-	bytes[6] = (crc7(0, bytes+1, 5)<<1)|1;
+	uint8_t tries;
 
-	printf("Sending CMD%d {0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x}\n",
-		bytes[1]&0x3f,
-		bytes[0], bytes[1], bytes[2], bytes[3],
-		bytes[4], bytes[5], bytes[6]);
+	bytes[0] = 0x40 | (cmd&0x3f);
+	memcpy(&bytes[1], args, sizeof(args));
+	bytes[5] = (crc7(0, bytes+1, 5)<<1)|1;
 
+	printf("Sending CMD%d {0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x}\n",
+		bytes[0]&0x3f,
+		bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
 
+	/* Send data to the card */
 	for (byte=0; byte<sizeof(bytes); byte++)
 		sd_xfer_byte(state, bytes[byte]);
+
+	/* Wait for the card to respond, positive or negative */
+	for (tries=0; tries<256; tries++) {
+		byte = sd_xfer_byte(state, 0xff);
+		if (!(byte & 0x80))
+			break;
+	}
 	
-	return 0;
+	return byte;
+}
+
+
+static int sd_send_cmd4(struct sd_state *state, uint8_t cmd,
+			uint8_t a1, uint8_t a2, uint8_t a3, uint8_t a4) {
+	uint8_t args[4] = {a1, a2, a3, a4};
+	return sd_send_cmd(state, cmd, args);
 }
 
 struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
@@ -221,7 +237,7 @@ struct sd_state *sd_init(uint8_t data_in, uint8_t data_out,
 		return NULL;
 	}
 	gpio_set_direction(state->power, 1);
-	gpio_set_value(state->power, 0);
+	gpio_set_value(state->power, 1);
 
 
 	return state;
@@ -238,7 +254,7 @@ static int sd_end(struct sd_state *state) {
 
 void sd_deinit(struct sd_state **state) {
 	gpio_set_value((*state)->cs, 1);
-	gpio_set_value((*state)->power, 0);
+	gpio_set_value((*state)->power, 1);
 
 	gpio_unexport((*state)->data_in);
 	gpio_unexport((*state)->data_out);
@@ -256,13 +272,14 @@ int sd_reset(struct sd_state *state) {
 	int byte;
 	int tries;
 	int pulse;
+	int card_type;
 
 	bzero(args, sizeof(args));
 
 	printf("Beginning SD reset...\n");
-	gpio_set_value(state->power, 0);
-	usleep(50000);
 	gpio_set_value(state->power, 1);
+	usleep(50000);
+	gpio_set_value(state->power, 0);
 	usleep(50000);
 
 	/* Send 80 clock pulses */
@@ -270,25 +287,50 @@ int sd_reset(struct sd_state *state) {
 	for (pulse=0; pulse<80; pulse++)
 		sd_tick(state);
 
+	/* Reset the card */
 	sd_begin(state);
 	sd_send_cmd(state, SD_CMD0, args);
 	byte = sd_read_first(state);
-	sd_end(state);
-	printf("Reset SD card tries with result 0x%02x\n", byte);
 
-	/* Repeatedly send CMD1 until IDLE is cleared */
+
+	printf("Reset SD card with result 0x%02x\n", byte);
+
+	/* Repeatedly send CMD8 until IDLE is cleared */
+	card_type = 0;
 	for (byte=0xff, tries=0; byte!=0 && tries<10; tries++) {
 		sd_begin(state);
-		sd_send_cmd(state, SD_CMD1, args);
+		//sd_send_cmd4(state, SD_CMD8, 0, 0, 0x01, 0xaa);
+		sd_send_cmd4(state, SD_CMD1, 0, 0, 0, 0);
 		byte = sd_read_first(state);
 		sd_end(state);
-		printf("Result of CMD1: %d\n", byte);
+		printf("Result of CMD8: %d\n", byte);
+		if (byte & R1_ILLEGAL_COMMAND)
+			break;
 		usleep(20000);
 	}
-	printf("Sent CMD1 after %d tries with result 0x%02x\n", tries, byte);
+
+	if (byte & R1_ILLEGAL_COMMAND) {
+		for (tries=0; tries<4 && byte ; tries++) {
+			byte = sd_read_first(state);
+			if (byte != 0xaa)
+				break;
+		}
+		card_type = 1;
+	}
+	printf("Sent CMD8 after %d tries with result 0x%02x\n", tries, byte);
+
+	sd_begin(state);
+	sd_send_cmd4(state, SD_CMD55, 0, 0, 0, 0);
+	sd_send_cmd4(state, SD_CMD41, card_type?0:0x40, 0, 0, 0);
+	byte = sd_read_first(state);
+	sd_end(state);
+	printf("Value after sending ACMD41: 0x%02x\n", byte);
+	
 
 	state->blklen = 512;
 	gpio_set_value(state->cs, 0);
+
+	sd_end(state);
 
 	return byte==0;
 }

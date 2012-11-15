@@ -13,6 +13,9 @@
 #define SD_CMD16 16
 #define SD_CMD17 17
 
+#define SD_CMD41 41
+#define SD_CMD55 55
+
 struct sd_state;
 
 struct sd_state *sd_init(uint8_t cmd_in, uint8_t cmd_out, uint8_t clk,
