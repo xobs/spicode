@@ -2,6 +2,7 @@
 #define __SD_H__
 #include <stdint.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define SD_DEFAULT_BLKLEN 512
 
@@ -9,6 +10,13 @@
 #define NET_MAX_CONNECTIONS 20
 #define NET_PROMPT "cmd> "
 #define NET_MAX_TRIES 20
+
+#ifdef DEBUG
+#define DBG(fmt, ...) \
+        fprintf(stderr, "%s:%s:%d " fmt "\n", __FILE__, __func__, __LINE__, ##__VA_ARGS__)
+#else
+#define DBG(...)
+#endif
 
 enum sd_cmds {
 	SD_CMD0 = 0,
@@ -62,25 +70,32 @@ struct sd_cmd {
 
 
 struct sd {
-    enum sd_parse_mode    parse_mode;
+	int			should_exit;
 
-    int                         net_socket;
-    int                         net_fd;
-    struct sockaddr_in          net_sockaddr;
-    uint32_t                    net_buf_len;
-    uint8_t                     net_bfr[512];
-    uint32_t                    net_bfr_ptr;
+	enum sd_parse_mode	parse_mode;
 
-    struct sd_syscmd     *cmds;
+	int			net_socket;
+	int			net_fd;
+	struct sockaddr_in	net_sockaddr;
+	uint32_t		net_buf_len;
+	uint8_t			net_bfr[512];
+	uint32_t		net_bfr_ptr;
 
-    /* Raw SD commands */
-    uint8_t                     sd_registers[4];
-    uint32_t                    sd_blklen;
-    uint8_t                    *sd_buffer;
+	struct sd_syscmd	*cmds;
 
-    /* GPIO pins */
-    uint32_t                    sd_miso, sd_mosi;
-    uint32_t                    sd_clk, sd_cs, sd_power;
+	/* Raw SD commands */
+	uint8_t			sd_registers[4];
+	uint32_t		sd_blklen;
+	uint8_t			*sd_buffer;
+
+	/* GPIO pins */
+	uint32_t		sd_miso, sd_mosi;
+	uint32_t		sd_clk, sd_cs, sd_power;
+	uint32_t		sd_sector; /* Current sector */
+
+	/* NAND communications */
+	int			nand_fd;
+	pthread_t		nand_thread;
 };
 
 
@@ -113,5 +128,10 @@ int sd_set_blocklength(struct sd *state, uint32_t blklen);
 int sd_read_block(struct sd *state, uint32_t offset, void *block, uint32_t count);
 int sd_write_block(struct sd *state, uint32_t offset, const void *block, uint32_t count);
 
+
+int nand_init(struct sd *st);
+int nand_data_avail(struct sd *st);
+int nand_get_new_sample(struct sd *st, uint8_t data[13]);
+void *nand_thread(struct sd *sd);
 
 #endif /* __SD_H__ */

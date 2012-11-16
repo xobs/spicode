@@ -365,8 +365,11 @@ uint8_t send_cmd (		/* Returns command response (bit7==1:Send failed)*/
 		rcvr_mmc(state, &d, 1);
 	while ((d & 0x80) && --n);
 
-        printf("Sending CMD%d {0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x}: %x\n",
-                buf[0]&0x3f, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], d);
+	{
+		char msg[128];
+		snprintf(msg, sizeof(msg)-1, "CMD: %d %02x\n", buf[0]&0x3f, d);
+		net_write(state, msg);
+	}
 	return d;			/* Return with the response value */
 }
 
@@ -426,6 +429,24 @@ static int sd_net_do_reset(struct sd *state, int arg) {
 	return sd_reset(state);
 }
 
+static int sd_net_read_current_sector(struct sd *state, int arg) {
+	uint8_t block[512];
+	int offset;
+	int ret;
+	fprintf(stderr, "Reading from sector %d\n", state->sd_sector);
+	ret = sd_read_block(state, state->sd_sector, block, 1);
+	if (ret)
+		fprintf(stderr, "Couldn't read: %d\n", ret);
+
+	for (offset=0; offset<512; offset+=16) {
+		char line[256];
+		snprintf(line, sizeof(line)-1, "DATA: %02x - %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+			offset, block[offset+0], block[offset+1], block[offset+2], block[offset+3], block[offset+4], block[offset+5], block[offset+6], block[offset+7], block[offset+8], block[offset+9], block[offset+10], block[offset+11], block[offset+12], block[offset+13], block[offset+14], block[offset+15]);
+		net_write(state, line);
+	}
+	return 0;
+}
+
 static int sd_net_get_cid(struct sd *state, int arg) {
 	int ret;
 	uint8_t cid[16];
@@ -463,6 +484,7 @@ static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "rc", sd_net_do_reset);
 	parse_set_hook(state, "ci", sd_net_get_cid);
 	parse_set_hook(state, "cs", sd_net_get_csd);
+	parse_set_hook(state, "rs", sd_net_read_current_sector);
 	return 0;
 }
 
@@ -530,6 +552,7 @@ int sd_reset(struct sd *state) {
 	uint32_t tmr;
 	int s;
 
+	state->sd_sector = 0;
 	INIT_PORT(state);				/* Initialize control port */
 	for (n = 10; n; n--) rcvr_mmc(state, buf, 1);	/* 80 dummy clocks */
 

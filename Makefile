@@ -1,8 +1,8 @@
-SOURCES=gpio.c sd.c main.c net.c parse.c
+SOURCES=gpio.c sd.c main.c net.c parse.c nand.c
 OBJECTS=$(SOURCES:.c=.o)
 EXEC=spi
 MY_CFLAGS += -Wall -O0 -g
-MY_LIBS +=
+MY_LIBS += -lpthread
 
 all: $(OBJECTS)
 	$(CC) $(LIBS) $(LDFLAGS) $(OBJECTS) $(MY_LIBS) -o $(EXEC)
