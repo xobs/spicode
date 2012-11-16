@@ -1,3 +1,4 @@
+#define DEBUG
 #include <stdio.h>
 #include <stdint.h>
 #include <strings.h>
@@ -150,31 +151,6 @@ static void print_csd(void *csd_data) {
 	printf("    mult: %d\n", mult);
 	printf("    blocknr: %d\n", blocknr);
 	printf("    capacity: %d\n", blocknr * block_len);
-
-/*
-        printf("    MMCA version: %d\n", UNSTUFF_BITS(resp, 122, 4));
-        m = UNSTUFF_BITS(resp, 115, 4);
-        e = UNSTUFF_BITS(resp, 112, 3);
-        printf("    tacc_ns: %d\n", (tacc_exp[e] * tacc_mant[m] + 9) / 10);
-        printf("    tacc_clks: %d\n", UNSTUFF_BITS(resp, 104, 8) * 100);
-
-        m = UNSTUFF_BITS(resp, 99, 4);
-        e = UNSTUFF_BITS(resp, 96, 3);
-        printf("    max_dtr: %d\n", tran_exp[e] * tran_mant[m]);
-        printf("    cmdclass: %d\n", UNSTUFF_BITS(resp, 84, 12));
-
-        e = UNSTUFF_BITS(resp, 47, 3);
-        m = UNSTUFF_BITS(resp, 62, 12);
-        printf("    capacity: %d\n", (1 + m) << (e + 2));
-
-        printf("    read_blkbits: %d\n", UNSTUFF_BITS(resp, 80, 4));
-        printf("    read_partial: %d\n", UNSTUFF_BITS(resp, 79, 1));
-        printf("    write_misalign: %d\n", UNSTUFF_BITS(resp, 78, 1));
-        printf("    read_misalign: %d\n", UNSTUFF_BITS(resp, 77, 1));
-        printf("    r2w_factor: %d\n", UNSTUFF_BITS(resp, 26, 3));
-        printf("    write_blkbits: %d\n", UNSTUFF_BITS(resp, 22, 4));
-	printf("    Write partial: %d\n", UNSTUFF_BITS(resp, 21, 1));
-*/
 }
 
 struct sd_cid {
@@ -227,83 +203,85 @@ static void print_cid(void *cid) {
 }
 
 
-static void print_sr(void *sr) {
-	char *data = sr;
-	uint32_t status;
-	memcpy(&status, &data[1], sizeof(status));
-	printf("    Command index: %x\n", data[5]&0x1f);
-	printf("    Status: %x\n", status);
+
+static int set_binmode(struct sd *server, int arg) {
+	parse_set_mode(server, PARSE_MODE_BINARY);
+	return 0;
+}
+
+static int set_linemode(struct sd *server, int arg) {
+	parse_set_mode(server, PARSE_MODE_LINE);
+	return 0;
 }
 
 
+
 int main(int argc, char **argv) {
-	struct sd_state *state;
-	int i;
+	struct sd server;
 	int ret;
-	uint8_t ocr[4];
-	uint8_t csd[16];
-	uint8_t cid[16];
-	uint8_t sr[6];
-	uint8_t block[512];
+
+
+	bzero(&server, sizeof(server));
+
+	ret = net_init(&server);
+	if (ret < 0) {
+		perror("Couldn't initialize network");
+		return 1;
+	}
+
+	ret = parse_init(&server);
+	if (ret < 0) {
+		perror("Couldn't initialize parser");
+		return 1;
+	}
+
 	
-	state = sd_init(MISO_PIN, MOSI_PIN, CLK_PIN, CS_PIN, POWER_PIN);
-        if (!state)
+	ret = sd_init(&server,
+		      MISO_PIN, MOSI_PIN, CLK_PIN, CS_PIN, POWER_PIN);
+        if (ret < 0) {
                 return 1;
- 
+		perror("Couldn't initialize SD");
+		return 1;
+	}
+
+
+	ret = net_accept(&server);
+	if (ret < 0) {
+		perror("Couldn't accept network connections");
+		return 1;
+	}
+
+	parse_set_hook(&server, "bm", set_binmode);
+	parse_set_hook(&server, "lm", set_linemode);
+
+
 	/* Initialize the card, waiting for a response of "1" */
-	sd_reset(state);
-
-	printf("Card is reset.  Waiting to get CID...\n");
-	sleep(2);
-	
-	ret = sd_get_cid(state, cid);
-	if (ret) {
-		printf("Unable to get CID\n");
-	}
-	else {
-		printf("CID:\n");
-		print_cid(cid);
-	}
-
-	printf("Waiting to get CSD...\n");
-	sleep(2);
-	ret = sd_get_csd(state, csd);
-	if (ret) {
-		printf("Unable to get CSD\n");
-	}
-	else {
-		print_csd(csd);
-		printf("CSD:\n");
-		for (i=0; i<sizeof(csd); i++)
-			printf("    0x%02x %c\n", csd[i], isprint(csd[i])?csd[i]:'.');
-	}
 
 
-	printf("Waiting to read data...\n");
-	sleep(2);
-
-
-	if ((ret = sd_read_block(state, 0, block, 1)))
-		printf("Unable to read data: %d\n", ret);
-	else {
-		uint8_t *offset = block;
-		for (i=0; i<sizeof(block); i++) {
-			printf("%02x ", block[i]);
-			if (!((i+1)&0x7))
-				printf(" ");
-			if (!((i+1)&0xf)) {
-				int j;
-				printf("|");
-				for (j=0; j<16; j++)
-					printf("%c", isprint(offset[j])?offset[j]:'.');
-				printf("|\n");
-				offset += 16;
-			}
+	while (1) {
+		struct sd_cmd cmd;
+		ret = parse_get_next_command(&server, &cmd);
+		if (ret < 0) {
+			perror("Quitting");
+			net_deinit(&server);
+			parse_deinit(&server);
+			return 1;
 		}
+
+#ifdef DEBUG
+		fprintf(stderr, "Got command: %c%c - %s", cmd.cmd[0], cmd.cmd[1],
+			cmd.syscmd->description);
+		if (cmd.syscmd->flags & CMD_FLAG_ARG)
+			fprintf(stderr, " - arg: %d", cmd.arg);
+		fprintf(stderr, "\n");
+#endif
+
+		/* In reality, all commands should have a handle routine */
+		if (cmd.syscmd->handle_cmd)
+			cmd.syscmd->handle_cmd(&server, cmd.arg);
+		else
+			fprintf(stderr, "WARNING: Command %c%c missing handle_cmd\n",
+				cmd.cmd[0], cmd.cmd[1]);
 	}
-
-
-	sd_deinit(&state);
-
 	return 0;
 }

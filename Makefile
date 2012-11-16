@@ -1,4 +1,4 @@
-SOURCES=gpio.c sd.c main.c
+SOURCES=gpio.c sd.c main.c net.c parse.c
 OBJECTS=$(SOURCES:.c=.o)
 EXEC=spi
 MY_CFLAGS += -Wall -O0 -g

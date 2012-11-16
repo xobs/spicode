@@ -52,13 +52,6 @@ enum disk_ioctl_arg {
 };
 
 
-struct sd_state {
-        /* Pin numbers */
-        uint32_t miso, mosi, clk, cs, power;
-        uint32_t blklen;
-	enum disk_status status;
-};
-
 
 /*-------------------------------------------------------------------------*/
 /* Platform dependent macros and functions needed to be modified           */
@@ -69,13 +62,13 @@ struct sd_state {
 #define	INIT_PORT(state)	init_port(state)	/* Initialize MMC control port (CS=H, CLK=L, DI=H, DO=in) */
 #define DLY_US(n)	usleep(n)	/* Delay n microseconds */
 
-#define	CS_H()		gpio_set_value(state->cs, CS_DESEL) /* Set MMC CS "high" */
-#define	CS_L()		gpio_set_value(state->cs, CS_SEL) /* Set MMC CS "low" */
-#define	CK_H()		gpio_set_value(state->clk, 1); usleep(2) /* Set MMC CLK "high" */
-#define	CK_L()		gpio_set_value(state->clk, 0); usleep(2) /* Set MMC CLK "low" */
-#define	DI_H()		gpio_set_value(state->mosi, 1) /* Set MMC DI "high" */
-#define	DI_L()		gpio_set_value(state->mosi, 0) /* Set MMC DI "low" */
-#define DO		gpio_get_value(state->miso)	/* Test for MMC DO ('H':true, 'L':false) */
+#define	CS_H()		gpio_set_value(state->sd_cs, CS_DESEL) /* Set MMC CS "high" */
+#define	CS_L()		gpio_set_value(state->sd_cs, CS_SEL) /* Set MMC CS "low" */
+#define	CK_H()		gpio_set_value(state->sd_clk, 1); usleep(2) /* Set MMC CLK "high" */
+#define	CK_L()		gpio_set_value(state->sd_clk, 0); usleep(2) /* Set MMC CLK "low" */
+#define	DI_H()		gpio_set_value(state->sd_mosi, 1) /* Set MMC DI "high" */
+#define	DI_L()		gpio_set_value(state->sd_mosi, 0) /* Set MMC DI "low" */
+#define DO		gpio_get_value(state->sd_miso)	/* Test for MMC DO ('H':true, 'L':false) */
 
 
 /*--------------------------------------------------------------------------
@@ -118,11 +111,11 @@ static uint32_t Stat = STA_NO_INIT;	/* Disk status */
 static uint8_t CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
 
 
-static int init_port(struct sd_state *state) {
-        gpio_set_value(state->power, SD_OFF);
+static int init_port(struct sd *state) {
+        gpio_set_value(state->sd_power, SD_OFF);
 	CS_H();
 	usleep(100000);
-        gpio_set_value(state->power, SD_ON);
+        gpio_set_value(state->sd_power, SD_ON);
 	usleep(100000);
 	return 0;
 }
@@ -135,7 +128,7 @@ static int init_port(struct sd_state *state) {
 
 static
 void xmit_mmc (
-	struct sd_state *state,
+	struct sd *state,
 	const uint8_t* buff,	/* Data to be sent */
 	uint32_t bc				/* Number of bytes to send */
 )
@@ -172,7 +165,7 @@ void xmit_mmc (
 
 static
 void rcvr_mmc (
-	struct sd_state *state,
+	struct sd *state,
 	uint8_t *buff,	/* Pointer to read buffer */
 	uint32_t bc		/* Number of bytes to receive */
 )
@@ -211,7 +204,7 @@ void rcvr_mmc (
 
 static
 int wait_ready (		/* 1:OK, 0:Timeout */
-	struct sd_state *state
+	struct sd *state
 )
 {
 	uint8_t d;
@@ -235,7 +228,7 @@ int wait_ready (		/* 1:OK, 0:Timeout */
 
 static
 void sd_end (
-	struct sd_state *state
+	struct sd *state
 )
 {
 	uint8_t d;
@@ -252,7 +245,7 @@ void sd_end (
 
 static
 int sd_begin (	/* 1:OK, 0:Timeout */
-	struct sd_state *state
+	struct sd *state
 )
 {
 	uint8_t d;
@@ -274,7 +267,7 @@ int sd_begin (	/* 1:OK, 0:Timeout */
 
 static
 int rcvr_datablock (	/* 1:OK, 0:Failed */
-	struct sd_state *state,
+	struct sd *state,
 	uint8_t *buff,			/* Data buffer to store received data */
 	uint32_t btr			/* Byte count */
 )
@@ -304,7 +297,7 @@ int rcvr_datablock (	/* 1:OK, 0:Failed */
 
 static
 int xmit_datablock (	/* 1:OK, 0:Failed */
-	struct sd_state *state,
+	struct sd *state,
 	const uint8_t *buff,	/* 512 byte data block to be transmitted */
 	uint8_t token			/* Data/Stop token */
 )
@@ -335,7 +328,7 @@ int xmit_datablock (	/* 1:OK, 0:Failed */
 
 static
 uint8_t send_cmd (		/* Returns command response (bit7==1:Send failed)*/
-	struct sd_state *state,
+	struct sd *state,
 	uint8_t cmd,		/* Command byte */
 	int32_t arg		/* Argument */
 )
@@ -391,7 +384,7 @@ uint8_t send_cmd (		/* Returns command response (bit7==1:Send failed)*/
 /*-----------------------------------------------------------------------*/
 
 int disk_status (
-	struct sd_state *state
+	struct sd *state
 )
 {
 	int s;
@@ -419,73 +412,120 @@ int disk_status (
 /* Initialize Disk Drive                                                 */
 /*-----------------------------------------------------------------------*/
 
-struct sd_state *sd_init(uint8_t miso, uint8_t mosi,
-                         uint8_t clk, uint8_t cs, uint8_t power) {
-	struct sd_state *state;
+static int sd_net_power_on(struct sd *state, int arg) {
+	gpio_set_value(state->sd_power, SD_ON);
+	return 0;
+}
 
+static int sd_net_power_off(struct sd *state, int arg) {
+	gpio_set_value(state->sd_power, SD_OFF);
+	return 0;
+}
 
-	state = malloc(sizeof(struct sd_state));
-	if (!state) {
-		perror("Couldn't allocate memory for sd_state");
-		return NULL;
-	}
+static int sd_net_do_reset(struct sd *state, int arg) {
+	return sd_reset(state);
+}
 
-	state->miso = miso;
-	state->mosi = mosi;
-	state->clk = clk;
-	state->cs = cs;
-	state->power = power;
+static int sd_net_get_cid(struct sd *state, int arg) {
+	int ret;
+	uint8_t cid[16];
+	char cid_line[256];
+	ret = sd_get_cid(state, cid);
+	if (ret)
+		return -1;
 
-	if (gpio_export(state->miso)) {
-		perror("Unable to export DATA IN pin");
-		sd_deinit(&state);
-		return NULL;
-	}
-	gpio_set_direction(state->miso, GPIO_IN);
+	snprintf(cid_line, sizeof(cid_line)-1, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		cid[0], cid[1], cid[2], cid[3], cid[4], cid[5], cid[6], cid[7],
+		cid[8], cid[9], cid[10], cid[11], cid[12], cid[13], cid[14], cid[15]);
+	net_write(state, cid_line);
+	return 0;
+}
 
+static int sd_net_get_csd(struct sd *state, int arg) {
+	int ret;
+	uint8_t csd[16];
+	char csd_line[256];
+	ret = sd_get_csd(state, csd);
+	if (ret)
+		return -1;
 
-	if (gpio_export(state->mosi)) {
-		perror("Unable to export DATA OUT pin");
-		sd_deinit(&state);
-		return NULL;
-	}
-	gpio_set_direction(state->mosi, GPIO_OUT);
-	gpio_set_value(state->mosi, 1);
-
-
-	if (gpio_export(state->clk)) {
-		perror("Unable to export CLK pin");
-		sd_deinit(&state);
-		return NULL;
-	}
-	gpio_set_direction(state->clk, GPIO_OUT);
-	gpio_set_value(state->clk, 1);
-
-
-	/* Grab the chip select pin and deassert it */
-	if (gpio_export(state->cs)) {
-		perror("Unable to export CS pin");
-		sd_deinit(&state);
-		return NULL;
-	}
-	gpio_set_direction(state->cs, GPIO_OUT);
-	gpio_set_value(state->cs, CS_DESEL);
-
-	/* Power down the card */
-	if (gpio_export(state->power)) {
-		perror("Unable to export power pin");
-		sd_deinit(&state);
-		return NULL;
-	}
-	gpio_set_direction(state->power, GPIO_OUT);
-	gpio_set_value(state->power, SD_OFF);
-
-
-	return state;
+	snprintf(csd_line, sizeof(csd_line)-1, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		csd[0], csd[1], csd[2], csd[3], csd[4], csd[5], csd[6], csd[7],
+		csd[8], csd[9], csd[10], csd[11], csd[12], csd[13], csd[14], csd[15]);
+	net_write(state, csd_line);
+	return 0;
 }
 
 
-int sd_reset(struct sd_state *state) {
+static int install_hooks(struct sd *state) {
+	parse_set_hook(state, "p+", sd_net_power_on);
+	parse_set_hook(state, "p-", sd_net_power_off);
+	parse_set_hook(state, "rc", sd_net_do_reset);
+	parse_set_hook(state, "ci", sd_net_get_cid);
+	parse_set_hook(state, "cs", sd_net_get_csd);
+	return 0;
+}
+
+int sd_init(struct sd *state, uint8_t miso, uint8_t mosi,
+	    uint8_t clk, uint8_t cs, uint8_t power) {
+
+	state->sd_miso = miso;
+	state->sd_mosi = mosi;
+	state->sd_clk = clk;
+	state->sd_cs = cs;
+	state->sd_power = power;
+
+	if (gpio_export(state->sd_miso)) {
+		perror("Unable to export DATA IN pin");
+		sd_deinit(&state);
+		return -1;
+	}
+	gpio_set_direction(state->sd_miso, GPIO_IN);
+
+
+	if (gpio_export(state->sd_mosi)) {
+		perror("Unable to export DATA OUT pin");
+		sd_deinit(&state);
+		return -1;
+	}
+	gpio_set_direction(state->sd_mosi, GPIO_OUT);
+	gpio_set_value(state->sd_mosi, 1);
+
+
+	if (gpio_export(state->sd_clk)) {
+		perror("Unable to export CLK pin");
+		sd_deinit(&state);
+		return -1;
+	}
+	gpio_set_direction(state->sd_clk, GPIO_OUT);
+	gpio_set_value(state->sd_clk, 1);
+
+
+	/* Grab the chip select pin and deassert it */
+	if (gpio_export(state->sd_cs)) {
+		perror("Unable to export CS pin");
+		sd_deinit(&state);
+		return -1;
+	}
+	gpio_set_direction(state->sd_cs, GPIO_OUT);
+	gpio_set_value(state->sd_cs, CS_DESEL);
+
+	/* Power down the card */
+	if (gpio_export(state->sd_power)) {
+		perror("Unable to export power pin");
+		sd_deinit(&state);
+		return -1;
+	}
+	gpio_set_direction(state->sd_power, GPIO_OUT);
+	gpio_set_value(state->sd_power, SD_OFF);
+
+	install_hooks(state);
+
+	return 0;
+}
+
+
+int sd_reset(struct sd *state) {
 	uint8_t n, ty, cmd, buf[4];
 	uint32_t tmr;
 	int s;
@@ -539,7 +579,7 @@ int sd_reset(struct sd_state *state) {
 /*-----------------------------------------------------------------------*/
 
 int sd_read_block (
-	struct sd_state *state,	/* Physical drive nmuber (0) */
+	struct sd *state,	/* Physical drive nmuber (0) */
 	uint32_t sector,	/* Start sector number (LBA) */
 	void *buff,		/* Pointer to the data buffer to store read data */
 	uint32_t count		/* Sector count (1..128) */
@@ -569,15 +609,15 @@ int sd_read_block (
 	return count ? RES_ERROR : RES_OK;
 }
 
-void sd_deinit(struct sd_state **state) {
-	gpio_set_value((*state)->cs, CS_DESEL);
-	gpio_set_value((*state)->power, SD_OFF);
+void sd_deinit(struct sd **state) {
+	gpio_set_value((*state)->sd_cs, CS_DESEL);
+	gpio_set_value((*state)->sd_power, SD_OFF);
 
-	gpio_unexport((*state)->miso);
-	gpio_unexport((*state)->mosi);
-	gpio_unexport((*state)->clk);
-	gpio_unexport((*state)->cs);
-	gpio_unexport((*state)->power);
+	gpio_unexport((*state)->sd_miso);
+	gpio_unexport((*state)->sd_mosi);
+	gpio_unexport((*state)->sd_clk);
+	gpio_unexport((*state)->sd_cs);
+	gpio_unexport((*state)->sd_power);
 	free(*state);
 	*state = NULL;
 }
@@ -589,7 +629,7 @@ void sd_deinit(struct sd_state **state) {
 /*-----------------------------------------------------------------------*/
 
 int sd_write_block (
-	struct sd_state *state,
+	struct sd *state,
 	uint32_t sector,		/* Start sector number (LBA) */
 	const void *buff,	/* Pointer to the data to be written */
 	uint32_t count			/* Sector count (1..128) */
@@ -626,7 +666,7 @@ int sd_write_block (
 /* Miscellaneous Functions                                               */
 /*-----------------------------------------------------------------------*/
 
-int sd_get_csd(struct sd_state *state, uint8_t *csd) {
+int sd_get_csd(struct sd *state, uint8_t *csd) {
 	int ret;
 	bzero(csd, 16);
 	ret = send_cmd(state, CMD9, 0);
@@ -635,7 +675,7 @@ int sd_get_csd(struct sd_state *state, uint8_t *csd) {
 	return !rcvr_datablock(state, csd, 16);
 }
 
-int sd_get_cid(struct sd_state *state, uint8_t *cid) {
+int sd_get_cid(struct sd *state, uint8_t *cid) {
 	int ret;
 	bzero(cid, 16);
 	ret = send_cmd(state, CMD10, 0);
@@ -646,7 +686,7 @@ int sd_get_cid(struct sd_state *state, uint8_t *cid) {
 
 
 int disk_ioctl (
-	struct sd_state *state,
+	struct sd *state,
 	uint8_t ctrl,		/* Control code */
 	void *buff		/* Buffer to send/receive control data */
 )
