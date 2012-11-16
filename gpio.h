@@ -1,5 +1,11 @@
 #ifndef __GPIO_H__
 #define __GPIO_H__
+
+enum gpio_dir {
+	GPIO_IN = 0,
+	GPIO_OUT = 1,
+};
+
 int gpio_export(int gpio);
 int gpio_unexport(int gpio);
 int gpio_set_direction(int gpio, int is_output);

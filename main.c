@@ -25,17 +25,17 @@
 
 /** Definitions for Falconwing board
 #define CS_PIN 1
-#define DATA_IN_PIN 7
+#define MISO_PIN 7
 #define CLK_PIN 4
-#define DATA_OUT_PIN 2
+#define MOSI_PIN 2
 #define POWER_PIN 3
 */
 
 /** Definitions for Kovan test jig */
 #define CS_PIN 50
-#define DATA_IN_PIN 62
+#define MISO_PIN 62
 #define CLK_PIN 46
-#define DATA_OUT_PIN 48
+#define MOSI_PIN 48
 #define POWER_PIN 55
 
 static const unsigned int tran_exp[] = {
@@ -246,21 +246,29 @@ int main(int argc, char **argv) {
 	uint8_t sr[6];
 	uint8_t block[512];
 	
-	state = sd_init(DATA_IN_PIN, DATA_OUT_PIN, CLK_PIN, CS_PIN, POWER_PIN);
-	if (!state)
-		return 1;
-
+	state = sd_init(MISO_PIN, MOSI_PIN, CLK_PIN, CS_PIN, POWER_PIN);
+        if (!state)
+                return 1;
+ 
 	/* Initialize the card, waiting for a response of "1" */
 	sd_reset(state);
 
-	/* Read the OCR register */
-	sd_get_ocr(state, ocr);
-	printf("OCR:\n");
-	for (i=0; i<sizeof(ocr); i++)
-		printf("    0x%02x %c\n", ocr[i], isprint(ocr[i])?ocr[i]:'.');
-	//printf("Setting block length: 0x%02x\n", sd_set_blocklength(state, 512));
+	printf("Card is reset.  Waiting to get CID...\n");
+	sleep(2);
+	
+	ret = sd_get_cid(state, cid);
+	if (ret) {
+		printf("Unable to get CID\n");
+	}
+	else {
+		printf("CID:\n");
+		print_cid(cid);
+	}
 
-	if ((ret=sd_get_csd(state, csd))) {
+	printf("Waiting to get CSD...\n");
+	sleep(2);
+	ret = sd_get_csd(state, csd);
+	if (ret) {
 		printf("Unable to get CSD\n");
 	}
 	else {
@@ -269,28 +277,10 @@ int main(int argc, char **argv) {
 		for (i=0; i<sizeof(csd); i++)
 			printf("    0x%02x %c\n", csd[i], isprint(csd[i])?csd[i]:'.');
 	}
-	
-	if ((ret=sd_get_cid(state, cid))) {
-		printf("Unable to get CID\n");
-	}
-	else {
-		printf("CID:\n");
-		print_cid(cid);
-	}
 
 
-	if ((ret=sd_get_sr(state, sr))) {
-		printf("Unable to get SR: %d\n", ret);
-	}
-	else {
-		printf("SR:\n");
-		print_sr(sr);
-	}
-
-
-	if ((ret = sd_set_blocklength(state, 512)))
-		printf("Unable to set block length: %d\n", ret);
-
+	printf("Waiting to read data...\n");
+	sleep(2);
 
 
 	if ((ret = sd_read_block(state, 0, block, 1)))
