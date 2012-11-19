@@ -7,6 +7,7 @@
 #define SD_DEFAULT_BLKLEN 512
 
 #define NET_PORT 7283
+#define NET_DATA_PORT 17283
 #define NET_MAX_CONNECTIONS 20
 #define NET_PROMPT "cmd> "
 #define NET_MAX_TRIES 20
@@ -17,6 +18,13 @@
 #else
 #define DBG(...)
 #endif
+
+enum net_data_types {
+	NET_DATA_UNKNOWN = 0,
+	NET_DATA_NAND = 1,
+	NET_DATA_SD = 2,
+	NET_DATA_CMD = 3,
+};
 
 enum sd_cmds {
 	SD_CMD0 = 0,
@@ -75,11 +83,14 @@ struct sd {
 	enum sd_parse_mode	parse_mode;
 
 	int			net_socket;
+	int			net_socket_data;
 	int			net_fd;
 	struct sockaddr_in	net_sockaddr;
+	struct sockaddr_in	net_sockaddr_data;
 	uint32_t		net_buf_len;
 	uint8_t			net_bfr[512];
 	uint32_t		net_bfr_ptr;
+	int			net_data_port;
 
 	struct sd_syscmd	*cmds;
 
@@ -110,7 +121,8 @@ int parse_set_hook(struct sd *server, char cmd[2], int
 
 int net_init(struct sd *server);
 int net_accept(struct sd *server);
-int net_write(struct sd *server, char *txt);
+int net_write_line(struct sd *server, char *txt);
+int net_write_data(struct sd *server, void *data, size_t count);
 int net_get_packet(struct sd *server, uint8_t **data);
 int net_deinit(struct sd *server);
 
@@ -132,6 +144,6 @@ int sd_write_block(struct sd *state, uint32_t offset, const void *block, uint32_
 int nand_init(struct sd *st);
 int nand_data_avail(struct sd *st);
 int nand_get_new_sample(struct sd *st, uint8_t data[13]);
-void *nand_thread(struct sd *sd);
+void *nand_thread(void *arg);
 
 #endif /* __SD_H__ */

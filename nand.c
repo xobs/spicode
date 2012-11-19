@@ -161,17 +161,18 @@ int nand_init(struct sd *sd) {
 }
 
 
-void *nand_thread(struct sd *sd) {
+void *nand_thread(void *arg) {
+	struct sd *sd = arg;
 	while (!sd->should_exit) {
-		char output[256];
-		uint8_t data[2];
+		uint8_t data[3];
+
 		if (!nand_data_avail(sd))
 			continue;
 	
-		nand_get_new_sample(sd, data);
-		snprintf(output, sizeof(output)-1, "NAND: %02x %02x\n",
-			 data[0], data[1]);
-		net_write(sd, output);
+		/* Obtain the new sample and send it over the wire */
+		nand_get_new_sample(sd, data+1);
+		data[0] = NET_DATA_NAND;
+		net_write_data(sd, data, sizeof(data));
 	}
 
 	return NULL;

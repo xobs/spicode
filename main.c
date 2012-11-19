@@ -223,15 +223,15 @@ int main(int argc, char **argv) {
 
 	bzero(&server, sizeof(server));
 
-	ret = net_init(&server);
-	if (ret < 0) {
-		perror("Couldn't initialize network");
-		return 1;
-	}
-
 	ret = parse_init(&server);
 	if (ret < 0) {
 		perror("Couldn't initialize parser");
+		return 1;
+	}
+
+	ret = net_init(&server);
+	if (ret < 0) {
+		perror("Couldn't initialize network");
 		return 1;
 	}
 

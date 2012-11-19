@@ -100,8 +100,10 @@ int gpio_set_value(int gpio, int value) {
 
 	fd = open(gpio_path, O_WRONLY);
 	if (fd == -1) {
-		fprintf(stderr, "Value file: [%s]\n", gpio_path);
-		perror("Couldn't open value file for gpio");
+		char errormsg[256];
+		snprintf(errormsg, sizeof(errormsg)-1, "Value file %s: %s\n",
+				gpio_path, strerror(errno));
+		fprintf(stderr, errormsg);
 		return -errno;
 	}
 

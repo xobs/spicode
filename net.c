@@ -12,13 +12,24 @@
 
 #include "sd.h"
 
-
-int net_write(struct sd *server, char *txt) {
+/* Write a line of text out to the text console */
+int net_write_line(struct sd *server, char *txt) {
     return write(server->net_fd, txt, strlen(txt)+1);
 }
 
+int net_write_data(struct sd *server, void *data, size_t count) {
+    int ret;
+    ret = sendto(server->net_socket_data, data, count, 0,
+		(const struct sockaddr *)&server->net_sockaddr_data,
+		sizeof(server->net_sockaddr_data));
+    if (ret == -1)
+        perror("Unable to send data");
+    return ret;
+}
+
 /* Note: This assumes the client is very well behaved (e.g. it sends
- * complete commands in a single packet)
+ * complete commands in a single packet).
+ * It will block until a packet is received.
  */
 int net_get_packet(struct sd *server, uint8_t **data) {
     int ret;
@@ -64,14 +75,51 @@ int net_accept(struct sd *server) {
     server->net_fd = accept(server->net_socket,
                             (struct sockaddr *)&(server->net_sockaddr),
                             &len);
+    fprintf(stderr, "Connection from %s\n", inet_ntoa(server->net_sockaddr.sin_addr));
+    server->net_sockaddr_data.sin_addr = server->net_sockaddr.sin_addr;
+
     return server->net_fd;
 }
+
+
+int net_set_data_port(struct sd *server, int port) {
+    server->net_sockaddr_data.sin_port = htons(port);
+    return 0;
+}
+
+int net_set_data_addr(struct sd *server, int addr) {
+    server->net_sockaddr_data.sin_addr.s_addr = htonl(addr);
+    return 0;
+}
+
+
+static int net_init_data(struct sd *server) {
+    server->net_socket_data = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (server->net_socket_data == -1) {
+        close(server->net_socket);
+        perror("Couldn't create data socket");
+        return -1;
+    }
+
+    bzero(&server->net_sockaddr_data, sizeof(server->net_sockaddr_data));
+    server->net_sockaddr_data.sin_family = AF_INET;
+    server->net_sockaddr_data.sin_port = htons(server->net_data_port);
+
+    return 0;
+}
+
 
 int net_init(struct sd *server) {
     int res;
     int val;
     socklen_t len;
 
+    server->net_data_port = NET_DATA_PORT;
+
+    parse_set_hook(server, "up", net_set_data_port);
+    parse_set_hook(server, "ip", net_set_data_addr);
+
+    /* Set up the TCP channel */
     server->net_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server->net_socket < 0) {
         perror("Couldn't call socket()");
@@ -107,7 +155,9 @@ int net_init(struct sd *server) {
     val = 1;
     setsockopt(server->net_socket, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 
-    return 0;
+
+    /* Set up UDP data channel */
+    return net_init_data(server);
 }
 
 int net_deinit(struct sd *server) {

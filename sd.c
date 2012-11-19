@@ -366,9 +366,12 @@ uint8_t send_cmd (		/* Returns command response (bit7==1:Send failed)*/
 	while ((d & 0x80) && --n);
 
 	{
-		char msg[128];
-		snprintf(msg, sizeof(msg)-1, "CMD: %d %02x\n", buf[0]&0x3f, d);
-		net_write(state, msg);
+		/* Log the command (and result) to the console */
+		char log_buf[2+sizeof(buf)];
+		log_buf[0] = NET_DATA_CMD;
+		memcpy(log_buf+1, buf, sizeof(buf));
+		log_buf[sizeof(buf)+1] = d;
+		net_write_data(state, log_buf, sizeof(log_buf));
 	}
 	return d;			/* Return with the response value */
 }
@@ -430,20 +433,28 @@ static int sd_net_do_reset(struct sd *state, int arg) {
 }
 
 static int sd_net_read_current_sector(struct sd *state, int arg) {
-	uint8_t block[512];
-	int offset;
+	uint8_t block[513];
 	int ret;
 	fprintf(stderr, "Reading from sector %d\n", state->sd_sector);
-	ret = sd_read_block(state, state->sd_sector, block, 1);
+	ret = sd_read_block(state, state->sd_sector, block+1, 1);
 	if (ret)
 		fprintf(stderr, "Couldn't read: %d\n", ret);
+	block[0] = NET_DATA_SD;
+	net_write_data(state, block, sizeof(block));
 
-	for (offset=0; offset<512; offset+=16) {
-		char line[256];
-		snprintf(line, sizeof(line)-1, "DATA: %02x - %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-			offset, block[offset+0], block[offset+1], block[offset+2], block[offset+3], block[offset+4], block[offset+5], block[offset+6], block[offset+7], block[offset+8], block[offset+9], block[offset+10], block[offset+11], block[offset+12], block[offset+13], block[offset+14], block[offset+15]);
-		net_write(state, line);
-	}
+	state->sd_sector++;
+	return 0;
+}
+
+static int sd_net_set_current_sector(struct sd *state, int arg) {
+	state->sd_sector = ntohl(arg);
+	return 0;
+}
+
+static int sd_net_get_current_sector(struct sd *state, int arg) {
+	char msg[128];
+	snprintf(msg, sizeof(msg)-1, "Sector offset: %d\n", state->sd_sector);
+	net_write_line(state, msg);
 	return 0;
 }
 
@@ -458,7 +469,7 @@ static int sd_net_get_cid(struct sd *state, int arg) {
 	snprintf(cid_line, sizeof(cid_line)-1, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 		cid[0], cid[1], cid[2], cid[3], cid[4], cid[5], cid[6], cid[7],
 		cid[8], cid[9], cid[10], cid[11], cid[12], cid[13], cid[14], cid[15]);
-	net_write(state, cid_line);
+	net_write_line(state, cid_line);
 	return 0;
 }
 
@@ -473,7 +484,7 @@ static int sd_net_get_csd(struct sd *state, int arg) {
 	snprintf(csd_line, sizeof(csd_line)-1, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 		csd[0], csd[1], csd[2], csd[3], csd[4], csd[5], csd[6], csd[7],
 		csd[8], csd[9], csd[10], csd[11], csd[12], csd[13], csd[14], csd[15]);
-	net_write(state, csd_line);
+	net_write_line(state, csd_line);
 	return 0;
 }
 
@@ -485,6 +496,8 @@ static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "ci", sd_net_get_cid);
 	parse_set_hook(state, "cs", sd_net_get_csd);
 	parse_set_hook(state, "rs", sd_net_read_current_sector);
+	parse_set_hook(state, "so", sd_net_set_current_sector);
+	parse_set_hook(state, "go", sd_net_get_current_sector);
 	return 0;
 }
 

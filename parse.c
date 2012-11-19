@@ -70,13 +70,13 @@ static struct sd_syscmd __cmds[] = {
 
 static int do_help(struct sd *server, int arg) {
     struct sd_syscmd *c = server->cmds;
-    net_write(server, "Commands:\n");
+    net_write_line(server, "Commands:\n");
     while (c->description) {
         char help_line[512];
         snprintf(help_line, sizeof(help_line)-1, "    %c%c %s %c %s\n", 
                 c->cmd[0], c->cmd[1], (c->flags&CMD_FLAG_ARG)?"arg":"   ",
                 c->handle_cmd?' ':'*', c->description);
-        net_write(server, help_line);
+        net_write_line(server, help_line);
         c++;
     }
     return 0;
@@ -84,13 +84,13 @@ static int do_help(struct sd *server, int arg) {
 
 static int do_unknown_cmd(struct sd *server, int arg) {
     printf("Unrecognized command\n");
-    net_write(server, "? Unrecognized command\n");
+    net_write_line(server, "? Unrecognized command\n");
     return 0;
 }
 
 static int do_error_cmd(struct sd *server, int arg) {
     printf("Error\n");
-    net_write(server, "Error occurred\n");
+    net_write_line(server, "Error occurred\n");
     return 0;
 }
 
@@ -105,7 +105,7 @@ static struct sd_syscmd error_cmd =
 static struct sd_syscmd *get_syscmd(struct sd *server,
                                           const uint8_t txt[2]) {
     struct sd_syscmd *c = server->cmds;
-    while(c->description) {
+    while(c && c->description) {
         if (!memcmp(c->cmd, txt, sizeof(c->cmd)))
             return c;
         c++;
@@ -214,7 +214,7 @@ int parse_get_next_command(struct sd *server, struct sd_cmd *cmd) {
     int ret;
 
     if (server->parse_mode == PARSE_MODE_LINE)
-        net_write(server, NET_PROMPT);
+        net_write_line(server, NET_PROMPT);
     else
         fprintf(stderr, "Parse mode is %d\n", server->parse_mode);
 
