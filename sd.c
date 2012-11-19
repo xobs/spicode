@@ -500,8 +500,8 @@ static int sd_net_reset_buffer(struct sd *state, int arg) {
 	return 0;
 }
 
-static int sd_net_set_buffer_value(struct sd *state, int arg) {
-	state->sd_write_bfr[state->sd_write_buffer_offset++] = arg;
+static int sd_net_set_buffer_offset(struct sd *state, int arg) {
+	state->sd_write_buffer_offset = arg;
 	return 0;
 }
 
@@ -516,6 +516,11 @@ static int sd_net_get_buffer_offset(struct sd *state, int arg) {
 	data[0] = NET_DATA_BUFFER_OFFSET;
 	memcpy(data+1, &val, sizeof(val));
 	net_write_data(state, data, sizeof(data));
+	return 0;
+}
+
+static int sd_net_set_buffer_value(struct sd *state, int arg) {
+	state->sd_write_bfr[state->sd_write_buffer_offset++] = arg;
 	return 0;
 }
 
@@ -549,6 +554,7 @@ static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "rb", sd_net_reset_buffer);
 	parse_set_hook(state, "sb", sd_net_set_buffer_value);
 	parse_set_hook(state, "bp", sd_net_get_buffer_offset);
+	parse_set_hook(state, "bo", sd_net_set_buffer_offset);
 	parse_set_hook(state, "bc", sd_net_get_buffer_contents);
 	parse_set_hook(state, "cb", sd_net_copy_read_to_write_buffer);
 	return 0;
