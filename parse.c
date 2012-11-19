@@ -34,11 +34,12 @@ static struct sd_syscmd __cmds[] = {
     {"ws", 0, "Writes to current sector"},
     {"  ", 0, "", do_help},
 
-    {"rb", 0, "Resets buffer pointer to offset 0"},
-    {"sb", CMD_FLAG_ARG, "Sets buffer value to arg and increments the pointer"},
-    {"bp", 0, "Returns buffer pointer offset"},
+    {"rb", 0, "Resets write buffer pointer to offset 0"},
+    {"sb", CMD_FLAG_ARG, "Sets write buffer value to arg and increments the pointer"},
+    {"bp", 0, "Returns write buffer pointer offset"},
     {"ps", CMD_FLAG_ARG, "Sets pattern seed to arg"},
-    {"bc", 0, "Returns buffer contents"},
+    {"bc", 0, "Returns write buffer contents"},
+    {"cb", 0, "Copies the read buffer to the write buffer"},
     {"  ", 0, "", do_help},
 
     {"c+", 0, "Enable clock auto-tick"},

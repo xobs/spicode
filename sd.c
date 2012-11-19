@@ -64,8 +64,8 @@ enum disk_ioctl_arg {
 
 #define	CS_H()		gpio_set_value(state->sd_cs, CS_DESEL) /* Set MMC CS "high" */
 #define	CS_L()		gpio_set_value(state->sd_cs, CS_SEL) /* Set MMC CS "low" */
-#define	CK_H()		gpio_set_value(state->sd_clk, 1); usleep(2) /* Set MMC CLK "high" */
-#define	CK_L()		gpio_set_value(state->sd_clk, 0); usleep(2) /* Set MMC CLK "low" */
+#define	CK_H()		gpio_set_value(state->sd_clk, 1) /* Set MMC CLK "high" */
+#define	CK_L()		gpio_set_value(state->sd_clk, 0) /* Set MMC CLK "low" */
 #define	DI_H()		gpio_set_value(state->sd_mosi, 1) /* Set MMC DI "high" */
 #define	DI_L()		gpio_set_value(state->sd_mosi, 0) /* Set MMC DI "low" */
 #define DO		gpio_get_value(state->sd_miso)	/* Test for MMC DO ('H':true, 'L':false) */
@@ -114,9 +114,9 @@ static uint8_t CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
 static int init_port(struct sd *state) {
         gpio_set_value(state->sd_power, SD_OFF);
 	CS_H();
-	usleep(100000);
+	usleep(10000);
         gpio_set_value(state->sd_power, SD_ON);
-	usleep(100000);
+	usleep(10000);
 	return 0;
 }
 
@@ -435,15 +435,21 @@ static int sd_net_do_reset(struct sd *state, int arg) {
 static int sd_net_read_current_sector(struct sd *state, int arg) {
 	uint8_t block[513];
 	int ret;
-	fprintf(stderr, "Reading from sector %d\n", state->sd_sector);
-	ret = sd_read_block(state, state->sd_sector, block+1, 1);
-	if (ret)
+	ret = sd_read_block(state, state->sd_sector, state->sd_read_bfr, 1);
+	if (ret) {
 		fprintf(stderr, "Couldn't read: %d\n", ret);
+		return ret;
+	}
 	block[0] = NET_DATA_SD;
+	memcpy(block+1, state->sd_read_bfr, sizeof(state->sd_read_bfr));
 	net_write_data(state, block, sizeof(block));
+	return ret;
+}
 
-	state->sd_sector++;
-	return 0;
+static int sd_net_write_current_sector(struct sd *state, int arg) {
+	int ret;
+	ret = sd_write_block(state, state->sd_sector, state->sd_write_bfr, 1);
+	return ret;
 }
 
 static int sd_net_set_current_sector(struct sd *state, int arg) {
@@ -489,6 +495,46 @@ static int sd_net_get_csd(struct sd *state, int arg) {
 }
 
 
+static int sd_net_reset_buffer(struct sd *state, int arg) {
+	state->sd_write_buffer_offset = 0;
+	return 0;
+}
+
+static int sd_net_set_buffer_value(struct sd *state, int arg) {
+	state->sd_write_bfr[state->sd_write_buffer_offset++] = arg;
+	return 0;
+}
+
+static int sd_net_get_buffer_offset(struct sd *state, int arg) {
+	char line[256];
+	uint8_t data[5];
+	int val = htonl(state->sd_write_buffer_offset);
+	snprintf(line, sizeof(line)-1, "Buffer offset: %d\n",
+		 state->sd_write_buffer_offset);
+	net_write_line(state, line);
+
+	data[0] = NET_DATA_BUFFER_OFFSET;
+	memcpy(data+1, &val, sizeof(val));
+	net_write_data(state, data, sizeof(data));
+	return 0;
+}
+
+static int sd_net_get_buffer_contents(struct sd *state, int arg) {
+	char buffer[513];
+	buffer[0] = NET_DATA_BUFFER_CONTENTS;
+	memcpy(buffer+1, state->sd_write_bfr, sizeof(state->sd_write_bfr));
+	net_write_data(state, buffer, sizeof(buffer));
+	return 0;
+}
+
+static int sd_net_copy_read_to_write_buffer(struct sd *state, int arg) {
+	memcpy(state->sd_write_bfr,
+	       state->sd_read_bfr,
+	       sizeof(state->sd_write_bfr));
+	return 0;
+}
+
+
 static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "p+", sd_net_power_on);
 	parse_set_hook(state, "p-", sd_net_power_off);
@@ -496,8 +542,15 @@ static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "ci", sd_net_get_cid);
 	parse_set_hook(state, "cs", sd_net_get_csd);
 	parse_set_hook(state, "rs", sd_net_read_current_sector);
+	parse_set_hook(state, "ws", sd_net_write_current_sector);
 	parse_set_hook(state, "so", sd_net_set_current_sector);
 	parse_set_hook(state, "go", sd_net_get_current_sector);
+
+	parse_set_hook(state, "rb", sd_net_reset_buffer);
+	parse_set_hook(state, "sb", sd_net_set_buffer_value);
+	parse_set_hook(state, "bp", sd_net_get_buffer_offset);
+	parse_set_hook(state, "bc", sd_net_get_buffer_contents);
+	parse_set_hook(state, "cb", sd_net_copy_read_to_write_buffer);
 	return 0;
 }
 

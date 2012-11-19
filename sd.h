@@ -24,6 +24,8 @@ enum net_data_types {
 	NET_DATA_NAND = 1,
 	NET_DATA_SD = 2,
 	NET_DATA_CMD = 3,
+	NET_DATA_BUFFER_OFFSET = 4,
+	NET_DATA_BUFFER_CONTENTS = 5,
 };
 
 enum sd_cmds {
@@ -103,6 +105,9 @@ struct sd {
 	uint32_t		sd_miso, sd_mosi;
 	uint32_t		sd_clk, sd_cs, sd_power;
 	uint32_t		sd_sector; /* Current sector */
+	uint32_t		sd_write_buffer_offset;
+	uint8_t			sd_read_bfr[512];
+	uint8_t			sd_write_bfr[512];
 
 	/* NAND communications */
 	int			nand_fd;
@@ -110,7 +115,9 @@ struct sd {
 };
 
 
-#define CMD_FLAG_ARG 0x01 /* True if the command has an arg */
+enum cmd_flags {
+	CMD_FLAG_ARG = 1, /* True if the command has an arg */
+};
 
 int parse_init(struct sd *server);
 int parse_get_next_command(struct sd *server, struct sd_cmd *cmd);
