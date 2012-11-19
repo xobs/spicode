@@ -14,39 +14,43 @@
 
 static int do_help(struct sd *server, int arg);
 
+#define HELP_BLANK_LINE    {"  ", 0, "", do_help},
+
 static struct sd_syscmd __cmds[] = {
     {"rc", 0, "Resets card, counters, and buffers"},
     {"bm", 0, "Switches to binary network mode"},
     {"lm", 0, "Switches to line network mode"},
     {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"ci", 0, "Returns card CID"},
     {"cs", 0, "Returns card CSD"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"so", CMD_FLAG_ARG, "Sets sector offset to arg"},
     {"sz", CMD_FLAG_ARG, "Sets sector size to arg"},
     {"go", 0, "Gets sector offset"},
     {"gz", 0, "Gets sector size"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"rs", 0, "Reads from current sector"},
     {"ws", 0, "Writes to current sector"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"rb", 0, "Resets write buffer pointer to offset 0"},
     {"sb", CMD_FLAG_ARG, "Sets write buffer value to arg and increments the pointer"},
     {"bp", 0, "Returns write buffer pointer offset"},
-    {"ps", CMD_FLAG_ARG, "Sets pattern seed to arg"},
+    {"bo", CMD_FLAG_ARG, "Sets the buffer pointer offset to the specified arg"},
     {"bc", 0, "Returns write buffer contents"},
     {"cb", 0, "Copies the read buffer to the write buffer"},
-    {"  ", 0, "", do_help},
+    {"ps", CMD_FLAG_ARG, "Sets pattern seed to arg"},
+    HELP_BLANK_LINE
 
     {"c+", 0, "Enable clock auto-tick"},
     {"c-", 0, "Disable clock auto-tick"},
     {"tk", 0, "Tick clock once"},
     {"tc", CMD_FLAG_ARG, "Tick clock number of times specified by arg"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"r0", CMD_FLAG_ARG, "Set SD register 0 to arg value"},
     {"r1", CMD_FLAG_ARG, "Set SD register 1 to arg value"},
@@ -54,18 +58,19 @@ static struct sd_syscmd __cmds[] = {
     {"r3", CMD_FLAG_ARG, "Set SD register 3 to arg value"},
     {"cd", CMD_FLAG_ARG, "Send raw SD command specified by the arg"},
     {"rr", 0, "Resets register values to 0"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"p-", 0, "Turns card power off"},
     {"p+", 0, "Turns card power on and resets card"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"ip", CMD_FLAG_ARG, "Set destination IPv4 address to arg"},
     {"up", CMD_FLAG_ARG, "Set destination UDP port to arg"},
-    {"  ", 0, "", do_help},
+    HELP_BLANK_LINE
 
     {"he", 0, "Print this help message", do_help},
     {"??", 0, "Print this help message", do_help},
+    {"?\0", 0, "Print this help message", do_help},
     {"\0\0", 0, NULL},
 };
 
