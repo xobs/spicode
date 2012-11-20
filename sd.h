@@ -92,6 +92,7 @@ struct sd {
 	uint32_t		net_buf_len;
 	uint8_t			net_bfr[512];
 	uint32_t		net_bfr_ptr;
+	int			net_port;
 	int			net_data_port;
 
 	struct sd_syscmd	*cmds;
@@ -137,7 +138,6 @@ int net_deinit(struct sd *server);
 int sd_init(struct sd *server, uint8_t cmd_in, uint8_t cmd_out, uint8_t clk,
 			 uint8_t cs, uint8_t power);
 void sd_deinit(struct sd **state);
-
 int sd_reset(struct sd *state);
 int sd_get_ocr(struct sd *state, uint8_t ocr[4]);
 int sd_get_cid(struct sd *state, uint8_t cid[16]);

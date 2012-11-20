@@ -72,10 +72,12 @@ int net_get_packet(struct sd *server, uint8_t **data) {
 
 int net_accept(struct sd *server) {
     socklen_t len = sizeof(server->net_sockaddr);
+    printf("Listening on port %d\n", server->net_port);
     server->net_fd = accept(server->net_socket,
                             (struct sockaddr *)&(server->net_sockaddr),
                             &len);
-    fprintf(stderr, "Connection from %s\n", inet_ntoa(server->net_sockaddr.sin_addr));
+    printf("Connection from %s\n", inet_ntoa(server->net_sockaddr.sin_addr));
+    printf("Sending data on UDP port %d\n", server->net_data_port);
     server->net_sockaddr_data.sin_addr = server->net_sockaddr.sin_addr;
 
     return server->net_fd;
@@ -115,6 +117,7 @@ int net_init(struct sd *server) {
     socklen_t len;
 
     server->net_data_port = NET_DATA_PORT;
+    server->net_port = NET_PORT;
 
     parse_set_hook(server, "up", net_set_data_port);
     parse_set_hook(server, "ip", net_set_data_addr);
@@ -128,7 +131,7 @@ int net_init(struct sd *server) {
 
     bzero(&server->net_sockaddr, sizeof(server->net_sockaddr));
     server->net_sockaddr.sin_family = AF_INET;
-    server->net_sockaddr.sin_port = htons(NET_PORT);
+    server->net_sockaddr.sin_port = htons(server->net_port);
     server->net_sockaddr.sin_addr.s_addr = INADDR_ANY;
 
     res = bind(server->net_socket,
