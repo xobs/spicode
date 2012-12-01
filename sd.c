@@ -658,6 +658,7 @@ int sd_reset(struct sd *state) {
 	state->sd_sector = 0;
 	INIT_PORT(state);				/* Initialize control port */
 	gpio_set_value(state->fpga_reset_clock, 0);
+	fpga_reset_ticks(state);
 	clock_gettime(CLOCK_MONOTONIC, &state->fpga_starttime);
 	for (n = 10; n; n--) rcvr_mmc(state, buf, 1);	/* 80 dummy clocks */
 

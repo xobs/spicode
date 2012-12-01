@@ -139,6 +139,7 @@ struct sd {
 	int			fpga_wraps;
 	uint32_t		fpga_wrap_pin;
 	int			fpga_wrap_fd;
+	uint32_t		fpga_clock_ticks;
 };
 
 
@@ -185,6 +186,9 @@ int fpga_get_new_sample(struct sd *st, uint8_t data[13]);
 int fpga_read_data(struct sd *st);
 int fpga_ready_fd(struct sd *st);
 int fpga_overflow_fd(struct sd *st);
+int fpga_tick_clock(struct sd *sd);
+int fpga_reset_ticks(struct sd *sd);
+uint32_t fpga_ticks(struct sd *sd);
 
 
 int pkt_send_error(struct sd *sd, uint32_t code, char *msg);

@@ -197,3 +197,17 @@ int fpga_ready_fd(struct sd *sd) {
 int fpga_overflow_fd(struct sd *sd) {
 	return sd->fpga_overflow_fd;
 }
+
+int fpga_reset_ticks(struct sd *sd) {
+	sd->fpga_clock_ticks = 0;
+	return 0;
+}
+
+int fpga_tick_clock(struct sd *sd) {
+	sd->fpga_clock_ticks++;
+	return 0;
+}
+
+uint32_t fpga_ticks(struct sd *sd) {
+	return sd->fpga_clock_ticks;
+}

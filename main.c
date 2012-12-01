@@ -321,6 +321,7 @@ int main(int argc, char **argv) {
 		}
 		if (handles[2].revents | POLLIN) {
 			fprintf(stderr, "Clock wrapped\n");
+			fpga_tick_clock(&server);
 		}
 	}
 	net_deinit(&server);

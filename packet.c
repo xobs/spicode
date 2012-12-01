@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include "sd.h"
 
+enum FPGAFrequency {
+	FPGA_FREQUENCY = 125000000,
+};
+
 enum PacketType {
 	PACKET_UNKNOWN = 0,
 	PACKET_ERROR = 1,
@@ -28,6 +32,35 @@ static int pkt_set_header(struct sd *sd, char *pkt, int type) {
 	long sec, nsec;
 	pkt[0] = type;
 	sd_get_elapsed(sd, &sec, &nsec);
+	sec = htonl(sec);
+	nsec = htonl(nsec);
+	memcpy(pkt+1, &sec, sizeof(sec));
+	memcpy(pkt+5, &nsec, sizeof(nsec));
+	return 0;
+}
+
+
+/* Generic packet header (for FPGA ticks)
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  1   | Packet type (as defined in WPacketType)
+ *     1   |  4   | Seconds since reset
+ *     5   |  4   | Nanoseconds since reset
+ */
+static int pkt_set_header_fpga(struct sd *sd, char *pkt, uint32_t fpga_counter, int type) {
+	uint32_t ticks = fpga_ticks(sd);
+	long long total_ticks = ticks*0x100000000LL + fpga_counter;
+	long long total_secs;
+	long long nsec_ticks;
+	uint32_t sec, nsec;
+
+	total_secs = total_ticks / FPGA_FREQUENCY;
+	nsec_ticks = total_ticks - (total_secs * FPGA_FREQUENCY);
+	sec = total_secs;
+	nsec = (nsec_ticks * 1000000000) / FPGA_FREQUENCY;
+	fprintf(stderr, "After %d ticks, we have %d sec and %d nsec\n", ticks, sec, nsec);
+
+	pkt[0] = type;
 	sec = htonl(sec);
 	nsec = htonl(nsec);
 	memcpy(pkt+1, &sec, sizeof(sec));
@@ -69,7 +102,7 @@ int pkt_send_error(struct sd *sd, uint32_t code, char *msg) {
  */
 int pkt_send_nand_cycle(struct sd *sd, uint32_t fpga_counter, uint8_t data, uint8_t ctrl, uint8_t unk[2]) {
 	char pkt[9+1+1+2];
-	pkt_set_header(sd, pkt, PACKET_NAND_CYCLE);
+	pkt_set_header_fpga(sd, pkt, fpga_counter, PACKET_NAND_CYCLE);
 	pkt[9] = data;
 	pkt[10] = ctrl;
 	pkt[11] = unk[0];
