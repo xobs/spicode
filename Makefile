@@ -1,4 +1,4 @@
-SOURCES=gpio.c sd.c main.c net.c parse.c fpga.c
+SOURCES=gpio.c sd.c main.c net.c parse.c fpga.c packet.c
 OBJECTS=$(SOURCES:.c=.o)
 HEADERS=$(wildcard *.h)
 EXEC=spi

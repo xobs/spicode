@@ -539,6 +539,26 @@ static int sd_net_copy_read_to_write_buffer(struct sd *state, int arg) {
 	return 0;
 }
 
+int sd_get_elapsed(struct sd *state, time_t *tv_sec, long *tv_nsec) {
+	struct timespec now;
+	int ret;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &now);
+	if (ret == -1) {
+		perror("Couldn't get time");
+		return ret;
+	}
+
+	if (now.tv_nsec < state->fpga_starttime.tv_nsec)
+		now.tv_nsec += 1000000000;
+	now.tv_nsec -= state->fpga_starttime.tv_nsec;
+	now.tv_sec -= state->fpga_starttime.tv_sec;
+
+	*tv_sec = now.tv_sec;
+	*tv_nsec = now.tv_nsec;
+	return 0;
+}
+
 
 static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "p+", sd_net_power_on);

@@ -19,6 +19,27 @@
 #define DBG(...)
 #endif
 
+#define MAKE_ERROR(x, y, z) (((x<<24)&0xff000000) | ((y<<16)&0x00ff0000) | ((z<<0)&0x0000ffff))
+
+/*
+ * Error codes are 32-bit values consisting of:
+ *
+ * XX YY ZZZZ
+ *
+ * XX = subsystem ID
+ * YY = error code within the subsystem
+ * ZZZZ = Subsystem-specific code
+ */
+
+enum subsystem_ids {
+	SUBSYS_NONE = 0,
+	SUBSYS_SD = 1,
+	SUBSYS_NET = 2,
+	SUBSYS_FPGA = 3,
+	SUBSYS_PARSE = 4,
+	SUBSYS_PKT = 5,
+};
+
 enum net_data_types {
 	NET_DATA_UNKNOWN = 0,
 	NET_DATA_NAND = 1,
@@ -152,13 +173,30 @@ int sd_get_sr(struct sd *state, uint8_t sr[6]);
 int sd_set_blocklength(struct sd *state, uint32_t blklen);
 int sd_read_block(struct sd *state, uint32_t offset, void *block, uint32_t count);
 int sd_write_block(struct sd *state, uint32_t offset, const void *block, uint32_t count);
+int sd_get_elapsed(struct sd *state, time_t *tv_sec, long *tv_nsec);
 
 
+enum fpga_errs {
+	FPGA_ERR_UNKNOWN_PKT,
+};
 int fpga_init(struct sd *st);
 int fpga_data_avail(struct sd *st);
 int fpga_get_new_sample(struct sd *st, uint8_t data[13]);
 int fpga_read_data(struct sd *st);
 int fpga_ready_fd(struct sd *st);
 int fpga_overflow_fd(struct sd *st);
+
+
+int pkt_send_error(struct sd *sd, uint32_t code, char *msg);
+int pkt_send_nand_cycle(struct sd *sd, uint32_t fpga_counter, uint8_t data, uint8_t ctrl, uint8_t unk[2]);
+int pkt_send_sd_data(struct sd *sd, uint8_t *block);
+int pkt_send_sd_cmd_arg(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, uint8_t val);
+int pkt_send_sd_response(struct sd *sd, uint32_t fpga_counter, uint8_t byte);
+int pkt_send_sd_cid(struct sd *sd, uint8_t cid[16]);
+int pkt_send_sd_csd(struct sd *sd, uint8_t csd[16]);
+int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset);
+int pkt_sent_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
+
+
 
 #endif /* __SD_H__ */

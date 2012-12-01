@@ -10,6 +10,12 @@
 #include "sd.h"
 #include "gpio.h"
 
+enum fpga_pkt_type {
+	PKT_NAND = 0,
+	PKT_SD_CMD = 1,
+	PKT_SD_RESPONSE = 2,
+};
+
 static int data_pins[] = {
 	45, // CAM_D[0]
 	44, // CAM_D[1]
@@ -139,15 +145,48 @@ int fpga_init(struct sd *sd) {
 
 
 int fpga_read_data(struct sd *sd) {
-	uint8_t data[8];
+	uint8_t pkt[8];
 	if (!fpga_data_avail(sd))
 		return -1;
 	
 	/* Obtain the new sample and send it over the wire */
-	fpga_get_new_sample(sd, data);
-	net_write_data(sd, data, sizeof(data));
+	fpga_get_new_sample(sd, pkt);
 
-	return 0;
+	uint32_t fpga_counter;
+	uint8_t pkt_type;
+
+	memcpy(&fpga_counter, pkt, sizeof(fpga_counter));
+	pkt_type = pkt[4] & 0x0f;
+
+	if (pkt_type == PKT_NAND) {
+		uint8_t data;
+		uint8_t ctrl;
+		uint8_t unknown[2];
+                data = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
+		ctrl = ((pkt[5] & 0xf0) >> 4) | ((pkt[6] & 0x03) << 4);
+		unknown[0] = ((pkt[6] & 0xfc) >> 2) | ((pkt[7] & 0x03) << 6);
+		unknown[1] = ((pkt[7] & 0x0c) >> 2);
+		return pkt_send_nand_cycle(sd, fpga_counter, data, ctrl, unknown);
+	}
+	else if (pkt_type == PKT_SD_CMD) {
+		uint8_t regnum;
+		uint8_t val;
+                regnum = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
+		val = ((pkt[5] & 0xf0) >> 4) | ((pkt[6] & 0x03) << 4);
+		return pkt_send_sd_cmd_arg(sd, fpga_counter, regnum, val);
+	}
+
+	else if (pkt_type == PKT_SD_RESPONSE) {
+		uint8_t val;
+                val = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
+		return pkt_send_sd_response(sd, fpga_counter, val);
+	}
+	else {
+		uint32_t err = MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_UNKNOWN_PKT, pkt_type);
+		char errmsg[512];
+		snprintf(errmsg, sizeof(errmsg)-1, "Unrecognized FPGA packet type %d", pkt_type);
+		return pkt_send_error(sd, err, errmsg);
+	}
 }
 
 
