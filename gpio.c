@@ -150,3 +150,45 @@ int gpio_get_value(int gpio) {
 }
 
 
+int gpio_set_edge(int gpio, int edge) {
+	char gpio_path[256];
+	int fd;
+	int ret;
+	char *edge_str;
+
+	if (edge == GPIO_EDGE_NONE)
+		edge_str = "none";
+	else if (edge == GPIO_EDGE_RISING)
+		edge_str = "rising";
+	else if (edge == GPIO_EDGE_FALLING)
+		edge_str = "falling";
+	else if (edge == GPIO_EDGE_BOTH)
+		edge_str = "both";
+	else {
+		fprintf(stderr, "Unrecognized edge type for gpio %d\n", gpio);
+		return -1;
+	}
+
+	snprintf(gpio_path, sizeof(gpio_path)-1, GPIO_PATH "/gpio%d/edge", gpio);
+
+	fd = open(gpio_path, O_WRONLY);
+	if (fd == -1) {
+		char errormsg[256];
+		snprintf(errormsg, sizeof(errormsg)-1, "Edge file %s: %s\n",
+				gpio_path, strerror(errno));
+		fputs(errormsg, stderr);
+		return -errno;
+	}
+
+	ret = write(fd, edge_str, strlen(edge_str));
+
+	if (ret == -1) {
+		fprintf(stderr, "Couldn't set GPIO %d edge: %s\n",
+			gpio, strerror(errno));
+		close(fd);
+		return -errno;
+	}
+
+	close(fd);
+	return 0;
+}
