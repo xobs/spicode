@@ -111,8 +111,7 @@ struct sd {
 	uint8_t			sd_write_bfr[512];
 
 	/* FPGA communications */
-	int			fpga_fd;
-	pthread_t		fpga_thread;
+	int			fpga_ready_fd, fpga_overflow_fd;
 	struct timespec		fpga_starttime;
 	/* Number of times FPGA clock has wrapped */
 	uint32_t		fpga_reset_clock;
@@ -138,6 +137,7 @@ int net_accept(struct sd *server);
 int net_write_line(struct sd *server, char *txt);
 int net_write_data(struct sd *server, void *data, size_t count);
 int net_get_packet(struct sd *server, uint8_t **data);
+int net_fd(struct sd *server);
 int net_deinit(struct sd *server);
 
 
@@ -157,6 +157,8 @@ int sd_write_block(struct sd *state, uint32_t offset, const void *block, uint32_
 int fpga_init(struct sd *st);
 int fpga_data_avail(struct sd *st);
 int fpga_get_new_sample(struct sd *st, uint8_t data[13]);
-void *fpga_thread(void *arg);
+int fpga_read_data(struct sd *st);
+int fpga_ready_fd(struct sd *st);
+int fpga_overflow_fd(struct sd *st);
 
 #endif /* __SD_H__ */

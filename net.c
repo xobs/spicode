@@ -27,6 +27,10 @@ int net_write_data(struct sd *server, void *data, size_t count) {
     return ret;
 }
 
+int net_fd(struct sd *server) {
+	return server->net_fd;
+}
+
 /* Note: This assumes the client is very well behaved (e.g. it sends
  * complete commands in a single packet).
  * It will block until a packet is received.

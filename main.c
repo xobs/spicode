@@ -4,6 +4,7 @@
 #include <strings.h>
 #include <string.h>
 #include <ctype.h>
+#include <poll.h>
 #include "sd.h"
 
 /* CHUMBY_BEND - 89
@@ -216,6 +217,34 @@ static int set_linemode(struct sd *server, int arg) {
 }
 
 
+static int handle_net_command(struct sd *server) {
+	struct sd_cmd cmd;
+	int ret;
+
+	ret = parse_get_next_command(server, &cmd);
+	if (ret < 0) {
+		perror("Quitting");
+		return -1;
+	}
+
+#ifdef DEBUG
+	fprintf(stderr, "Got command: %c%c - %s", cmd.cmd[0], cmd.cmd[1],
+		cmd.syscmd->description);
+	if (cmd.syscmd->flags & CMD_FLAG_ARG)
+		fprintf(stderr, " - arg: %d", cmd.arg);
+	fprintf(stderr, "\n");
+#endif
+
+	/* In reality, all commands should have a handle routine */
+	if (cmd.syscmd->handle_cmd)
+		cmd.syscmd->handle_cmd(server, cmd.arg);
+	else
+		fprintf(stderr, "WARNING: Command %c%c missing handle_cmd\n",
+			cmd.cmd[0], cmd.cmd[1]);
+	return 0;
+}
+
+
 
 int main(int argc, char **argv) {
 	struct sd server;
@@ -259,39 +288,42 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	pthread_create(&server.fpga_thread, NULL, fpga_thread, &server);
-
 	parse_set_hook(&server, "bm", set_binmode);
 	parse_set_hook(&server, "lm", set_linemode);
 
 
-	/* Initialize the card, waiting for a response of "1" */
-
-
 	while (1) {
-		struct sd_cmd cmd;
-		ret = parse_get_next_command(&server, &cmd);
+		struct pollfd handles[3];
+
+		bzero(handles, sizeof(handles));
+		handles[0].fd     = net_fd(&server);
+		handles[0].events = POLLIN | POLLHUP;
+		handles[1].fd     = fpga_ready_fd(&server);
+		handles[1].events = POLLIN | POLLHUP;
+		handles[2].fd     = fpga_overflow_fd(&server);
+		handles[2].events = POLLIN | POLLHUP;
+		ret = poll(handles, sizeof(handles)/sizeof(*handles), -1);
 		if (ret < 0) {
-			perror("Quitting");
-			net_deinit(&server);
-			parse_deinit(&server);
-			return 1;
+			perror("Couldn't poll");
+			break;
 		}
 
-#ifdef DEBUG
-		fprintf(stderr, "Got command: %c%c - %s", cmd.cmd[0], cmd.cmd[1],
-			cmd.syscmd->description);
-		if (cmd.syscmd->flags & CMD_FLAG_ARG)
-			fprintf(stderr, " - arg: %d", cmd.arg);
-		fprintf(stderr, "\n");
-#endif
-
-		/* In reality, all commands should have a handle routine */
-		if (cmd.syscmd->handle_cmd)
-			cmd.syscmd->handle_cmd(&server, cmd.arg);
-		else
-			fprintf(stderr, "WARNING: Command %c%c missing handle_cmd\n",
-				cmd.cmd[0], cmd.cmd[1]);
+		if (handles[0].revents | POLLHUP) {
+			printf("Remote side disconnected.  Quitting.\n");
+			break;
+		}
+		if (handles[0].revents | POLLIN) {
+			if (handle_net_command(&server))
+				break;
+		}
+		if (handles[1].revents | POLLIN) {
+			fpga_read_data(&server);
+		}
+		if (handles[2].revents | POLLIN) {
+			fprintf(stderr, "Clock wrapped\n");
+		}
 	}
+	net_deinit(&server);
+	parse_deinit(&server);
 	return 0;
 }

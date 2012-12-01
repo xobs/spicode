@@ -35,6 +35,7 @@ static int bank_select_pins[] = {
 };
 
 #define DATA_READY_PIN 61
+#define CLOCK_OVERFLOW_PIN 72
 #define GPIO_PATH "/sys/class/gpio"
 #define GET_NEW_SAMPLE_PIN 54
 
@@ -91,7 +92,7 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 int fpga_data_avail(struct sd *st) {
 /*
 	struct pollfd fdset[1];
-	fdset[0].fd = st->fpga_fd;
+	fdset[0].fd = st->fpga_ready_fd;
 	fdset[0].events = POLLPRI;
 	if (-1 == poll(fdset, 1, 3*1000)) {
 		perror("Error polling");
@@ -109,8 +110,15 @@ int fpga_init(struct sd *sd) {
 	gpio_export(DATA_READY_PIN);
 	gpio_set_direction(DATA_READY_PIN, GPIO_IN);
 	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, DATA_READY_PIN);
-	sd->fpga_fd = open(str, O_RDONLY | O_NONBLOCK);
-	if (sd->fpga_fd == -1)
+	sd->fpga_ready_fd = open(str, O_RDONLY | O_NONBLOCK);
+	if (sd->fpga_ready_fd == -1)
+		return -1;
+
+	gpio_export(CLOCK_OVERFLOW_PIN);
+	gpio_set_direction(CLOCK_OVERFLOW_PIN, GPIO_IN);
+	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, CLOCK_OVERFLOW_PIN);
+	sd->fpga_overflow_fd = open(str, O_RDONLY | O_NONBLOCK);
+	if (sd->fpga_overflow_fd == -1)
 		return -1;
 
 	for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++) {
@@ -130,19 +138,23 @@ int fpga_init(struct sd *sd) {
 }
 
 
-void *fpga_thread(void *arg) {
-	struct sd *sd = arg;
-	while (!sd->should_exit) {
-		uint8_t data[8];
-
-		if (!fpga_data_avail(sd))
-			continue;
+int fpga_read_data(struct sd *sd) {
+	uint8_t data[8];
+	if (!fpga_data_avail(sd))
+		return -1;
 	
-		/* Obtain the new sample and send it over the wire */
-		fpga_get_new_sample(sd, data);
-		net_write_data(sd, data, sizeof(data));
-	}
+	/* Obtain the new sample and send it over the wire */
+	fpga_get_new_sample(sd, data);
+	net_write_data(sd, data, sizeof(data));
 
-	return NULL;
+	return 0;
 }
 
+
+int fpga_ready_fd(struct sd *sd) {
+	return sd->fpga_ready_fd;
+}
+
+int fpga_overflow_fd(struct sd *sd) {
+	return sd->fpga_overflow_fd;
+}
