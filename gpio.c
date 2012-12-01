@@ -103,7 +103,7 @@ int gpio_set_value(int gpio, int value) {
 		char errormsg[256];
 		snprintf(errormsg, sizeof(errormsg)-1, "Value file %s: %s\n",
 				gpio_path, strerror(errno));
-		fprintf(stderr, errormsg);
+		fputs(errormsg, stderr);
 		return -errno;
 	}
 
