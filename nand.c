@@ -16,7 +16,30 @@ static volatile short *mem_16 = 0;
 static volatile char  *mem_8  = 0;
 static int *prev_mem_range = 0;
 
-static int data_pins[] = {45, 44, 42, 41, 40, 68, 38, 37, 63, 64, 65, 66, 67};
+static int data_pins[] = {
+	45, // CAM_D[0]
+	44, // CAM_D[1]
+	42, // CAM_D[2]
+	41, // CAM_D[3]
+	40, // CAM_D[4]
+	68, // LCD_G[2]
+	38, // CAM_D[6]
+	37, // CAM_D[7]
+	63, // LCD_R[3]
+	64, // LCD_R[4]
+	65, // LCD_R[5]
+	66, // LCD_G[0]
+	67, // LCD_G[1]
+	69, // LCD_G[3]
+	70, // LCD_G[4]
+	71, // LCD_G[5]
+};
+
+static int bank_select_pins[] = {
+	57, // LCD_HS
+	56, // LCD_VS
+};
+
 #define DATA_READY_PIN 61
 #define GPIO_PATH "/sys/class/gpio"
 #define GET_NEW_SAMPLE_PIN 54
@@ -100,11 +123,12 @@ static int get_gpio(int gpio) {
 	return !!(read_kernel_memory(gpio_offset, 0, 4) & (1<<(gpio & 0x1f)));
 }
 
-int nand_get_new_sample(struct sd *st, uint8_t bytes[2]) {
-	uint8_t data[13];
+int nand_get_new_sample(struct sd *st, uint8_t bytes[8]) {
+	uint8_t data[16];
 	long set_register = 0xd401901c;
 	long clr_register = 0xd4019028;
 	int tries;
+	int bank;
 	int i;
 	int ret;
 	usleep(2);
@@ -123,11 +147,30 @@ int nand_get_new_sample(struct sd *st, uint8_t bytes[2]) {
 	}
 	DBG("New sample never went ready!");
 
-	for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++)
-		data[i] = get_gpio(data_pins[i]);
+	for (bank=0; bank<4; bank++) {
+		gpio_set_value(bank_select_pins[0], !!(bank&1));
+		gpio_set_value(bank_select_pins[1], !!(bank&2));
+		usleep(2);
+		for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++)
+			data[i] = get_gpio(data_pins[i]);
+		bytes[bank*2+0] = (data[0]<<0)
+				| (data[1]<<1)
+				| (data[2]<<2)
+				| (data[3]<<3)
+				| (data[4]<<4)
+				| (data[5]<<5)
+				| (data[6]<<6)
+				| (data[7]<<7);
 
-	bytes[0] = data[0] | data[1]<<1 | data[2]<<2 | data[3]<<3 | data[4]<<4 | data[5]<<5 | data[6]<<6 | data[7]<<7;
-	bytes[1] = data[8] | data[9]<<1 | data[10]<<2 | data[11]<<3 | data[12]<<4;
+		bytes[bank*2+1] = (data[8]<<0)
+				| (data[9]<<1)
+				| (data[10]<<2)
+				| (data[11]<<3)
+				| (data[12]<<4)
+				| (data[13]<<5)
+				| (data[14]<<6)
+				| (data[15]<<7);
+	}
 	return ret;
 }
 
@@ -157,6 +200,15 @@ int nand_init(struct sd *sd) {
 		gpio_export(data_pins[i]);
 		gpio_set_direction(data_pins[i], GPIO_IN);
 	}
+
+	gpio_export(GET_NEW_SAMPLE_PIN);
+	gpio_set_direction(GET_NEW_SAMPLE_PIN, GPIO_OUT);
+
+	for (i=0; i<sizeof(bank_select_pins)/sizeof(*bank_select_pins); i++) {
+		gpio_export(bank_select_pins[i]);
+		gpio_set_direction(bank_select_pins[i], GPIO_OUT);
+		gpio_set_value(bank_select_pins[i], 0);
+	}
 	return 0;
 }
 
@@ -164,14 +216,13 @@ int nand_init(struct sd *sd) {
 void *nand_thread(void *arg) {
 	struct sd *sd = arg;
 	while (!sd->should_exit) {
-		uint8_t data[3];
+		uint8_t data[8];
 
 		if (!nand_data_avail(sd))
 			continue;
 	
 		/* Obtain the new sample and send it over the wire */
-		nand_get_new_sample(sd, data+1);
-		data[0] = NET_DATA_NAND;
+		nand_get_new_sample(sd, data);
 		net_write_data(sd, data, sizeof(data));
 	}
 

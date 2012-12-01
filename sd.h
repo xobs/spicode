@@ -113,6 +113,12 @@ struct sd {
 	/* NAND communications */
 	int			nand_fd;
 	pthread_t		nand_thread;
+	struct timespec		fpga_starttime;
+	/* Number of times FPGA clock has wrapped */
+	uint32_t		fpga_reset_clock;
+	int			fpga_wraps;
+	uint32_t		fpga_wrap_pin;
+	int			fpga_wrap_fd;
 };
 
 
@@ -136,7 +142,7 @@ int net_deinit(struct sd *server);
 
 
 int sd_init(struct sd *server, uint8_t cmd_in, uint8_t cmd_out, uint8_t clk,
-			 uint8_t cs, uint8_t power);
+			 uint8_t cs, uint8_t power, uint8_t reset_clock);
 void sd_deinit(struct sd **state);
 int sd_reset(struct sd *state);
 int sd_get_ocr(struct sd *state, uint8_t ocr[4]);

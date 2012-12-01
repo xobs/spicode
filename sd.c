@@ -561,13 +561,14 @@ static int install_hooks(struct sd *state) {
 }
 
 int sd_init(struct sd *state, uint8_t miso, uint8_t mosi,
-	    uint8_t clk, uint8_t cs, uint8_t power) {
+	    uint8_t clk, uint8_t cs, uint8_t power, uint8_t fpga_reset) {
 
 	state->sd_miso = miso;
 	state->sd_mosi = mosi;
 	state->sd_clk = clk;
 	state->sd_cs = cs;
 	state->sd_power = power;
+	state->fpga_reset_clock = fpga_reset;
 
 	if (gpio_export(state->sd_miso)) {
 		perror("Unable to export DATA IN pin");
@@ -613,6 +614,15 @@ int sd_init(struct sd *state, uint8_t miso, uint8_t mosi,
 	gpio_set_direction(state->sd_power, GPIO_OUT);
 	gpio_set_value(state->sd_power, SD_OFF);
 
+	/* Request the pin to reset the FPGA's clock */
+	if (gpio_export(state->fpga_reset_clock)) {
+		perror("Unable to export clock reset pin");
+		sd_deinit(&state);
+		return -1;
+	}
+	gpio_set_direction(state->fpga_reset_clock, GPIO_OUT);
+	gpio_set_value(state->fpga_reset_clock, 1);
+
 	install_hooks(state);
 
 	return 0;
@@ -624,8 +634,11 @@ int sd_reset(struct sd *state) {
 	uint32_t tmr;
 	int s;
 
+	gpio_set_value(state->fpga_reset_clock, 1);
 	state->sd_sector = 0;
 	INIT_PORT(state);				/* Initialize control port */
+	gpio_set_value(state->fpga_reset_clock, 0);
+	clock_gettime(CLOCK_MONOTONIC, &state->fpga_starttime);
 	for (n = 10; n; n--) rcvr_mmc(state, buf, 1);	/* 80 dummy clocks */
 
 	ty = 0;
@@ -713,6 +726,7 @@ void sd_deinit(struct sd **state) {
 	gpio_unexport((*state)->sd_clk);
 	gpio_unexport((*state)->sd_cs);
 	gpio_unexport((*state)->sd_power);
+	gpio_unexport((*state)->fpga_reset_clock);
 	free(*state);
 	*state = NULL;
 }

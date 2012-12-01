@@ -38,6 +38,7 @@
 #define CLK_PIN 46
 #define MOSI_PIN 48
 #define POWER_PIN 55
+#define CLOCK_RESET_PIN 59
 
 static const unsigned int tran_exp[] = {
         10000,          100000,         1000000,        10000000,
@@ -243,7 +244,8 @@ int main(int argc, char **argv) {
 
 	
 	ret = sd_init(&server,
-		      MISO_PIN, MOSI_PIN, CLK_PIN, CS_PIN, POWER_PIN);
+		      MISO_PIN, MOSI_PIN, CLK_PIN, CS_PIN,
+		      POWER_PIN, CLOCK_RESET_PIN);
         if (ret < 0) {
                 return 1;
 		perror("Couldn't initialize SD");
