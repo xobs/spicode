@@ -132,12 +132,14 @@ int gpio_get_value(int gpio) {
 
 	fd = open(gpio_path, O_RDONLY);
 	if (fd == -1) {
-		perror("Couldn't open value file for gpio");
+		fprintf(stderr, "Couldn't open value file for gpio %d: %s\n",
+			gpio, strerror(errno));
 		return -errno;
 	}
 
 	if (read(fd, gpio_path, sizeof(gpio_path)) <= 0) {
-		perror("Couldn't get input value");
+		fprintf(stderr, "Couldn't get input value for gpio %d: %s\n",
+			gpio, strerror(errno));
 		close(fd);
 		return -errno;
 	}
