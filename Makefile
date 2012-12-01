@@ -3,7 +3,7 @@ OBJECTS=$(SOURCES:.c=.o)
 HEADERS=$(wildcard *.h)
 EXEC=spi
 MY_CFLAGS += -Wall -O0 -g
-MY_LIBS += -lpthread
+MY_LIBS += -lpthread -lrt
 
 all: $(OBJECTS)
 	$(CC) $(LIBS) $(LDFLAGS) $(OBJECTS) $(MY_LIBS) -o $(EXEC)
