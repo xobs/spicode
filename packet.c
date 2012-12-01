@@ -58,7 +58,7 @@ static int pkt_set_header_fpga(struct sd *sd, char *pkt, uint32_t fpga_counter, 
 	nsec_ticks = total_ticks - (total_secs * FPGA_FREQUENCY);
 	sec = total_secs;
 	nsec = (nsec_ticks * 1000000000) / FPGA_FREQUENCY;
-	fprintf(stderr, "After %d ticks, we have %d sec and %d nsec\n", ticks, sec, nsec);
+//	fprintf(stderr, "After %d ticks, we have %d sec and %d nsec\n", ticks, sec, nsec);
 
 	pkt[0] = type;
 	sec = htonl(sec);
@@ -137,7 +137,7 @@ int pkt_send_sd_data(struct sd *sd, uint8_t *block) {
 
 int pkt_send_sd_cmd_arg(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, uint8_t val) {
 	char pkt[9+1+1];
-	pkt_set_header(sd, pkt, PACKET_SD_CMD_ARG);
+	pkt_set_header_fpga(sd, pkt, fpga_counter, PACKET_SD_CMD_ARG);
 	pkt[9] = regnum;
 	pkt[10] = val;
 	return net_write_data(sd, pkt, sizeof(pkt));
@@ -153,7 +153,7 @@ int pkt_send_sd_cmd_arg(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, ui
  */
 int pkt_send_sd_response(struct sd *sd, uint32_t fpga_counter, uint8_t byte) {
 	char pkt[9+1];
-	pkt_set_header(sd, pkt, PACKET_SD_RESPONSE);
+	pkt_set_header_fpga(sd, pkt, fpga_counter, PACKET_SD_RESPONSE);
 	pkt[9] = byte;
 	return net_write_data(sd, pkt, sizeof(pkt));
 }

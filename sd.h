@@ -153,6 +153,8 @@ int parse_set_mode(struct sd *server, enum sd_parse_mode mode);
 int parse_deinit(struct sd *server);
 int parse_set_hook(struct sd *server, char cmd[2], int
         (*hook)(struct sd *, int));
+int parse_write_prompt(struct sd *server);
+
 
 int net_init(struct sd *server);
 int net_accept(struct sd *server);

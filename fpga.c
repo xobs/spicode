@@ -44,6 +44,7 @@ static int bank_select_pins[] = {
 #define CLOCK_OVERFLOW_PIN 72
 #define GPIO_PATH "/sys/class/gpio"
 #define GET_NEW_SAMPLE_PIN 54
+#define SAMPLE_READY_PIN 60
 
 
 int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
@@ -59,7 +60,7 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 
 	ret = -1;
 	for (tries=0; tries<2; tries++) {
-		if (gpio_get_value(60)) {
+		if (gpio_get_value(SAMPLE_READY_PIN)) {
 			DBG("Gpio went high after %d tries", tries);
 			ret = 0;
 			break;
@@ -96,14 +97,6 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 }
 
 int fpga_data_avail(struct sd *st) {
-/*
-	struct pollfd fdset[1];
-	fdset[0].fd = st->fpga_ready_fd;
-	fdset[0].events = POLLPRI;
-	if (-1 == poll(fdset, 1, 3*1000)) {
-		perror("Error polling");
-	}
-*/
 	return gpio_get_value(DATA_READY_PIN);
 }
 
@@ -115,6 +108,7 @@ int fpga_init(struct sd *sd) {
 	/* Grab the "data ready pin", and open it so we can poll() */
 	gpio_export(DATA_READY_PIN);
 	gpio_set_direction(DATA_READY_PIN, GPIO_IN);
+	gpio_set_edge(DATA_READY_PIN, GPIO_EDGE_BOTH);
 	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, DATA_READY_PIN);
 	sd->fpga_ready_fd = open(str, O_RDONLY | O_NONBLOCK);
 	if (sd->fpga_ready_fd == -1)
@@ -122,6 +116,7 @@ int fpga_init(struct sd *sd) {
 
 	gpio_export(CLOCK_OVERFLOW_PIN);
 	gpio_set_direction(CLOCK_OVERFLOW_PIN, GPIO_IN);
+	gpio_set_edge(CLOCK_OVERFLOW_PIN, GPIO_EDGE_BOTH);
 	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, CLOCK_OVERFLOW_PIN);
 	sd->fpga_overflow_fd = open(str, O_RDONLY | O_NONBLOCK);
 	if (sd->fpga_overflow_fd == -1)
@@ -135,19 +130,25 @@ int fpga_init(struct sd *sd) {
 	gpio_export(GET_NEW_SAMPLE_PIN);
 	gpio_set_direction(GET_NEW_SAMPLE_PIN, GPIO_OUT);
 
+	gpio_export(SAMPLE_READY_PIN);
+	gpio_set_direction(SAMPLE_READY_PIN, GPIO_IN);
+
 	for (i=0; i<sizeof(bank_select_pins)/sizeof(*bank_select_pins); i++) {
 		gpio_export(bank_select_pins[i]);
 		gpio_set_direction(bank_select_pins[i], GPIO_OUT);
 		gpio_set_value(bank_select_pins[i], 0);
 	}
+
 	return 0;
 }
 
 
 int fpga_read_data(struct sd *sd) {
 	uint8_t pkt[8];
-	if (!fpga_data_avail(sd))
+	if (!fpga_data_avail(sd)) {
+		fprintf(stderr, "No data avilable!\n");
 		return -1;
+	}
 	
 	/* Obtain the new sample and send it over the wire */
 	fpga_get_new_sample(sd, pkt);
@@ -191,10 +192,16 @@ int fpga_read_data(struct sd *sd) {
 
 
 int fpga_ready_fd(struct sd *sd) {
+	char bfr[15];
+	/* Dummy read required to get poll() to work */
+	read(sd->fpga_ready_fd, bfr, sizeof(bfr));
 	return sd->fpga_ready_fd;
 }
 
 int fpga_overflow_fd(struct sd *sd) {
+	char bfr[15];
+	/* Dummy read required to get poll() to work */
+	read(sd->fpga_overflow_fd, bfr, sizeof(bfr));
 	return sd->fpga_overflow_fd;
 }
 

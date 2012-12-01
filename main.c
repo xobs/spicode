@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <poll.h>
 #include "sd.h"
+#include "gpio.h"
 
 /* CHUMBY_BEND - 89
  * IR_DETECT - 102
@@ -292,34 +293,45 @@ int main(int argc, char **argv) {
 	parse_set_hook(&server, "lm", set_linemode);
 
 
+	parse_write_prompt(&server);
 	while (1) {
 		struct pollfd handles[3];
+
+		/* Drain the FPGA buffer, if it's not empty */
+		usleep(3);
+		if (fpga_data_avail(&server)) {
+			fpga_read_data(&server);
+			continue;
+		}
 
 		bzero(handles, sizeof(handles));
 		handles[0].fd     = net_fd(&server);
 		handles[0].events = POLLIN | POLLHUP;
 		handles[1].fd     = fpga_ready_fd(&server);
-		handles[1].events = POLLIN | POLLHUP;
+		handles[1].events = POLLPRI;
 		handles[2].fd     = fpga_overflow_fd(&server);
-		handles[2].events = POLLIN | POLLHUP;
+		handles[2].events = POLLPRI;
+
 		ret = poll(handles, sizeof(handles)/sizeof(*handles), -1);
 		if (ret < 0) {
 			perror("Couldn't poll");
 			break;
 		}
 
-		if (handles[0].revents | POLLHUP) {
+		if (handles[0].revents & POLLHUP) {
 			printf("Remote side disconnected.  Quitting.\n");
 			break;
 		}
-		if (handles[0].revents | POLLIN) {
+		if (handles[0].revents & POLLIN) {
 			if (handle_net_command(&server))
 				break;
+			parse_write_prompt(&server);
 		}
-		if (handles[1].revents | POLLIN) {
+		if (handles[1].revents & POLLPRI) {
+			fprintf(stderr, "Got NAND data\n");
 			fpga_read_data(&server);
 		}
-		if (handles[2].revents | POLLIN) {
+		if (handles[2].revents & POLLPRI) {
 			fprintf(stderr, "Clock wrapped\n");
 			fpga_tick_clock(&server);
 		}

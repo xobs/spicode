@@ -215,14 +215,17 @@ static int real_parse_cmd(struct sd *server, struct sd_cmd *cmd,
     return size_copied;
 }
 
-int parse_get_next_command(struct sd *server, struct sd_cmd *cmd) {
-    uint8_t *buf;
-    int ret;
-
+int parse_write_prompt(struct sd *server) {
     if (server->parse_mode == PARSE_MODE_LINE)
         net_write_line(server, NET_PROMPT);
     else
         fprintf(stderr, "Parse mode is %d\n", server->parse_mode);
+    return 0;
+}
+
+int parse_get_next_command(struct sd *server, struct sd_cmd *cmd) {
+    uint8_t *buf;
+    int ret;
 
     ret = net_get_packet(server, &buf);
     if (ret <= 0)
