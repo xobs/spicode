@@ -110,9 +110,9 @@ struct sd {
 	uint8_t			sd_read_bfr[512];
 	uint8_t			sd_write_bfr[512];
 
-	/* NAND communications */
-	int			nand_fd;
-	pthread_t		nand_thread;
+	/* FPGA communications */
+	int			fpga_fd;
+	pthread_t		fpga_thread;
 	struct timespec		fpga_starttime;
 	/* Number of times FPGA clock has wrapped */
 	uint32_t		fpga_reset_clock;
@@ -154,9 +154,9 @@ int sd_read_block(struct sd *state, uint32_t offset, void *block, uint32_t count
 int sd_write_block(struct sd *state, uint32_t offset, const void *block, uint32_t count);
 
 
-int nand_init(struct sd *st);
-int nand_data_avail(struct sd *st);
-int nand_get_new_sample(struct sd *st, uint8_t data[13]);
-void *nand_thread(void *arg);
+int fpga_init(struct sd *st);
+int fpga_data_avail(struct sd *st);
+int fpga_get_new_sample(struct sd *st, uint8_t data[13]);
+void *fpga_thread(void *arg);
 
 #endif /* __SD_H__ */

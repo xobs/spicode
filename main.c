@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	ret = nand_init(&server);
+	ret = fpga_init(&server);
 	if (ret < 0) {
 		perror("Couldn't initialize NAND");
 		return 1;
@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	pthread_create(&server.nand_thread, NULL, nand_thread, &server);
+	pthread_create(&server.fpga_thread, NULL, fpga_thread, &server);
 
 	parse_set_hook(&server, "bm", set_binmode);
 	parse_set_hook(&server, "lm", set_linemode);

@@ -39,7 +39,7 @@ static int bank_select_pins[] = {
 #define GET_NEW_SAMPLE_PIN 54
 
 
-int nand_get_new_sample(struct sd *st, uint8_t bytes[8]) {
+int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	uint8_t data[16];
 	int tries;
 	int bank;
@@ -88,10 +88,10 @@ int nand_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	return ret;
 }
 
-int nand_data_avail(struct sd *st) {
+int fpga_data_avail(struct sd *st) {
 /*
 	struct pollfd fdset[1];
-	fdset[0].fd = st->nand_fd;
+	fdset[0].fd = st->fpga_fd;
 	fdset[0].events = POLLPRI;
 	if (-1 == poll(fdset, 1, 3*1000)) {
 		perror("Error polling");
@@ -101,7 +101,7 @@ int nand_data_avail(struct sd *st) {
 }
 
 
-int nand_init(struct sd *sd) {
+int fpga_init(struct sd *sd) {
 	int i;
 	char str[256];
 
@@ -109,8 +109,8 @@ int nand_init(struct sd *sd) {
 	gpio_export(DATA_READY_PIN);
 	gpio_set_direction(DATA_READY_PIN, GPIO_IN);
 	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, DATA_READY_PIN);
-	sd->nand_fd = open(str, O_RDONLY | O_NONBLOCK);
-	if (sd->nand_fd == -1)
+	sd->fpga_fd = open(str, O_RDONLY | O_NONBLOCK);
+	if (sd->fpga_fd == -1)
 		return -1;
 
 	for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++) {
@@ -130,16 +130,16 @@ int nand_init(struct sd *sd) {
 }
 
 
-void *nand_thread(void *arg) {
+void *fpga_thread(void *arg) {
 	struct sd *sd = arg;
 	while (!sd->should_exit) {
 		uint8_t data[8];
 
-		if (!nand_data_avail(sd))
+		if (!fpga_data_avail(sd))
 			continue;
 	
 		/* Obtain the new sample and send it over the wire */
-		nand_get_new_sample(sd, data);
+		fpga_get_new_sample(sd, data);
 		net_write_data(sd, data, sizeof(data));
 	}
 
