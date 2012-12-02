@@ -236,6 +236,7 @@ static int handle_net_command(struct sd *server) {
 	fprintf(stderr, "\n");
 #endif
 
+	pkt_send_command(server, &cmd);
 	/* In reality, all commands should have a handle routine */
 	if (cmd.syscmd->handle_cmd)
 		cmd.syscmd->handle_cmd(server, cmd.arg);

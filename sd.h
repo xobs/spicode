@@ -202,6 +202,7 @@ int pkt_send_sd_cid(struct sd *sd, uint8_t cid[16]);
 int pkt_send_sd_csd(struct sd *sd, uint8_t csd[16]);
 int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset);
 int pkt_sent_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
+int pkt_send_command(struct sd *sd, struct sd_cmd *cmd);
 
 
 

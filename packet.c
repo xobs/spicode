@@ -18,6 +18,7 @@ enum PacketType {
 	PACKET_SD_CSD = 7,
 	PACKET_BUFFER_OFFSET = 8,
 	PACKET_BUFFER_CONTENTS = 9,
+	PACKET_COMMAND = 10,
 };
 
 
@@ -221,5 +222,25 @@ int pkt_sent_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer)
 	pkt_set_header(sd, pkt, PACKET_BUFFER_CONTENTS);
 	pkt[9] = buffertype;
 	memcpy(pkt+10, buffer, 512);
+	return net_write_data(sd, pkt, sizeof(pkt));
+}
+
+
+/*
+ * PACKET_COMMAND format (CPU):
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  9   | Header
+ *     9   |  2   | Two-character command code
+ *    11   |  4   | 32-bit command argument
+ */
+int pkt_send_command(struct sd *sd, struct sd_cmd *cmd) {
+	char pkt[9+2+4];
+	uint32_t arg;
+	pkt_set_header(sd, pkt, PACKET_COMMAND);
+	pkt[9] = cmd->cmd[0];
+	pkt[10] = cmd->cmd[1];
+	arg = htonl(cmd->arg);
+	memcpy(pkt+9+2, &arg, sizeof(arg));
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
