@@ -698,6 +698,7 @@ int sd_reset(struct sd *state) {
 
 	sd_end(state);
 
+	pkt_send_reset(state);
 	return s;
 }
 

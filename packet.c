@@ -8,6 +8,9 @@ enum FPGAFrequency {
 	FPGA_FREQUENCY = 125000000,
 };
 
+#define PKT_VERSION_NUMBER 2
+#define PKT_HEADER_SIZE (1+4+4+2)
+
 enum PacketType {
 	PACKET_UNKNOWN = 0,
 	PACKET_ERROR = 1,
@@ -20,6 +23,7 @@ enum PacketType {
 	PACKET_BUFFER_OFFSET = 8,
 	PACKET_BUFFER_CONTENTS = 9,
 	PACKET_COMMAND = 10,
+	PACKET_RESET = 11,
 };
 
 
@@ -31,7 +35,6 @@ enum PacketType {
  *     5   |  4   | Nanoseconds since reset
  *     9   |  2   | Header size
  */
-#define PKT_HEADER_SIZE (1+4+4+2)
 
 static int pkt_set_header(struct sd *sd, char *pkt, int type, int size) {
 	long real_sec, real_nsec;
@@ -253,5 +256,20 @@ int pkt_send_command(struct sd *sd, struct sd_cmd *cmd) {
 	pkt[PKT_HEADER_SIZE+0] = cmd->cmd[0];
 	pkt[PKT_HEADER_SIZE+1] = cmd->cmd[1];
 	memcpy(pkt+PKT_HEADER_SIZE+2, &arg, sizeof(arg));
+	return net_write_data(sd, pkt, sizeof(pkt));
+}
+
+
+/*
+ * PACKET_RESET format (CPU):
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  11  | Header
+ *    11   |   1  | Command stream version number
+ */
+int pkt_send_reset(struct sd *sd) {
+	char pkt[PKT_HEADER_SIZE+1];
+	pkt_set_header(sd, pkt, PACKET_RESET, sizeof(pkt));
+	pkt[PKT_HEADER_SIZE+0] = PKT_VERSION_NUMBER;
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
