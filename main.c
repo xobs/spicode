@@ -301,12 +301,6 @@ int main(int argc, char **argv) {
 	while (1) {
 		struct pollfd handles[3];
 
-		/* Drain the FPGA buffer, if it's not empty */
-		if (fpga_data_avail(&server)) {
-			fpga_read_data(&server);
-			continue;
-		}
-
 		bzero(handles, sizeof(handles));
 		handles[0].fd     = net_fd(&server);
 		handles[0].events = POLLIN | POLLHUP;
@@ -334,6 +328,7 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "Got NAND data\n");
 			fpga_read_data(&server);
 		}
+#warning Check to see if the tick value has changed here
 		if (handles[2].revents & POLLPRI) {
 			fprintf(stderr, "Clock wrapped\n");
 			fpga_tick_clock(&server);
