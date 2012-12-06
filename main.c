@@ -42,6 +42,9 @@
 #define POWER_PIN 55
 #define CLOCK_RESET_PIN 59
 
+/* Time out after 250 ms, in order to check for e.g. FPGA data available */
+#define POLL_TIMEOUT 250
+
 static const unsigned int tran_exp[] = {
         10000,          100000,         1000000,        10000000,
         0,              0,              0,              0
@@ -312,7 +315,7 @@ int main(int argc, char **argv) {
 		handles[2].fd     = fpga_overflow_fd(&server);
 		handles[2].events = POLLPRI;
 
-		ret = poll(handles, sizeof(handles)/sizeof(*handles), -1);
+		ret = poll(handles, sizeof(handles)/sizeof(*handles), POLL_TIMEOUT);
 		if (ret < 0) {
 			perror("Couldn't poll");
 			break;
@@ -327,7 +330,7 @@ int main(int argc, char **argv) {
 				break;
 			parse_write_prompt(&server);
 		}
-		if (handles[1].revents & POLLPRI) {
+		if (fpga_data_avail(&server) || (handles[1].revents & POLLPRI)) {
 			fprintf(stderr, "Got NAND data\n");
 			fpga_read_data(&server);
 		}
