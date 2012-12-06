@@ -40,15 +40,6 @@ enum subsystem_ids {
 	SUBSYS_PKT = 5,
 };
 
-enum net_data_types {
-	NET_DATA_UNKNOWN = 0,
-	NET_DATA_NAND = 1,
-	NET_DATA_SD = 2,
-	NET_DATA_CMD = 3,
-	NET_DATA_BUFFER_OFFSET = 4,
-	NET_DATA_BUFFER_CONTENTS = 5,
-};
-
 enum sd_cmds {
 	SD_CMD0 = 0,
 	SD_CMD1 = 1,
@@ -196,12 +187,14 @@ uint32_t fpga_ticks(struct sd *sd);
 int pkt_send_error(struct sd *sd, uint32_t code, char *msg);
 int pkt_send_nand_cycle(struct sd *sd, uint32_t fpga_counter, uint8_t data, uint8_t ctrl, uint8_t unk[2]);
 int pkt_send_sd_data(struct sd *sd, uint8_t *block);
-int pkt_send_sd_cmd_arg(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, uint8_t val);
-int pkt_send_sd_response(struct sd *sd, uint32_t fpga_counter, uint8_t byte);
+int pkt_send_sd_cmd_arg(struct sd *sd, uint8_t regnum, uint8_t val);
+int pkt_send_sd_cmd_arg_fpga(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, uint8_t val);
+int pkt_send_sd_response(struct sd *sd, uint8_t byte);
+int pkt_send_sd_response_fpga(struct sd *sd, uint32_t fpga_counter, uint8_t byte);
 int pkt_send_sd_cid(struct sd *sd, uint8_t cid[16]);
 int pkt_send_sd_csd(struct sd *sd, uint8_t csd[16]);
 int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset);
-int pkt_sent_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
+int pkt_send_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
 int pkt_send_command(struct sd *sd, struct sd_cmd *cmd);
 int pkt_send_reset(struct sd *sd);
 

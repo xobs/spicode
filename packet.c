@@ -150,9 +150,27 @@ int pkt_send_sd_data(struct sd *sd, uint8_t *block) {
  *    12   |   1  | Value of the register or CMD number
  */
 
-int pkt_send_sd_cmd_arg(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, uint8_t val) {
+int pkt_send_sd_cmd_arg_fpga(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, uint8_t val) {
 	char pkt[PKT_HEADER_SIZE+1+1];
 	pkt_set_header_fpga(sd, pkt, fpga_counter, PACKET_SD_CMD_ARG, sizeof(pkt));
+	pkt[PKT_HEADER_SIZE+0] = regnum;
+	pkt[PKT_HEADER_SIZE+1] = val;
+	return net_write_data(sd, pkt, sizeof(pkt));
+}
+
+
+/*
+ * PACKET_SD_CMD_ARG format (FPGA):
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  11  | Header
+ *    11   |   1  | Register number (1, 2, 3, or 4), or 0 for the CMD byte
+ *    12   |   1  | Value of the register or CMD number
+ */
+
+int pkt_send_sd_cmd_arg(struct sd *sd, uint8_t regnum, uint8_t val) {
+	char pkt[PKT_HEADER_SIZE+1+1];
+	pkt_set_header(sd, pkt, PACKET_SD_CMD_ARG, sizeof(pkt));
 	pkt[PKT_HEADER_SIZE+0] = regnum;
 	pkt[PKT_HEADER_SIZE+1] = val;
 	return net_write_data(sd, pkt, sizeof(pkt));
@@ -166,9 +184,24 @@ int pkt_send_sd_cmd_arg(struct sd *sd, uint32_t fpga_counter, uint8_t regnum, ui
  *     0   |  11  | Header
  *    11   |   1  | The contents of the first byte that the card answered with
  */
-int pkt_send_sd_response(struct sd *sd, uint32_t fpga_counter, uint8_t byte) {
+int pkt_send_sd_response_fpga(struct sd *sd, uint32_t fpga_counter, uint8_t byte) {
 	char pkt[PKT_HEADER_SIZE+1];
 	pkt_set_header_fpga(sd, pkt, fpga_counter, PACKET_SD_RESPONSE, sizeof(pkt));
+	pkt[PKT_HEADER_SIZE+0] = byte;
+	return net_write_data(sd, pkt, sizeof(pkt));
+}
+
+
+/*
+ * PACKET_SD_RESPONSE format (FPGA):
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  11  | Header
+ *    11   |   1  | The contents of the first byte that the card answered with
+ */
+int pkt_send_sd_response(struct sd *sd, uint8_t byte) {
+	char pkt[PKT_HEADER_SIZE+1];
+	pkt_set_header(sd, pkt, PACKET_SD_RESPONSE, sizeof(pkt));
 	pkt[PKT_HEADER_SIZE+0] = byte;
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
@@ -231,7 +264,7 @@ int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset) {
  *    11   |  1   | 1 if this is the read buffer, 2 if it's write
  *    12   | 512  | Contents of the buffer
  */
-int pkt_sent_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer) {
+int pkt_send_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer) {
 	char pkt[PKT_HEADER_SIZE+1+512];
 	pkt_set_header(sd, pkt, PACKET_BUFFER_CONTENTS, sizeof(pkt));
 	pkt[PKT_HEADER_SIZE+0] = buffertype;

@@ -134,6 +134,7 @@ void xmit_mmc (
 )
 {
 	uint8_t d;
+	int count = 0;
 
 
 	do {
@@ -154,6 +155,7 @@ void xmit_mmc (
 		CK_H(); CK_L();
 		if (d & 0x01) DI_H(); else DI_L();	/* bit0 */
 		CK_H(); CK_L();
+		pkt_send_sd_cmd_arg(state, count++, d);
 	} while (--bc);
 }
 
@@ -365,14 +367,7 @@ uint8_t send_cmd (		/* Returns command response (bit7==1:Send failed)*/
 		rcvr_mmc(state, &d, 1);
 	while ((d & 0x80) && --n);
 
-	{
-		/* Log the command (and result) to the console */
-		char log_buf[2+sizeof(buf)];
-		log_buf[0] = NET_DATA_CMD;
-		memcpy(log_buf+1, buf, sizeof(buf));
-		log_buf[sizeof(buf)+1] = d;
-		net_write_data(state, log_buf, sizeof(log_buf));
-	}
+	pkt_send_sd_response(state, d);
 	return d;			/* Return with the response value */
 }
 
@@ -433,16 +428,13 @@ static int sd_net_do_reset(struct sd *state, int arg) {
 }
 
 static int sd_net_read_current_sector(struct sd *state, int arg) {
-	uint8_t block[513];
 	int ret;
 	ret = sd_read_block(state, state->sd_sector, state->sd_read_bfr, 1);
 	if (ret) {
 		fprintf(stderr, "Couldn't read: %d\n", ret);
 		return ret;
 	}
-	block[0] = NET_DATA_SD;
-	memcpy(block+1, state->sd_read_bfr, sizeof(state->sd_read_bfr));
-	net_write_data(state, block, sizeof(block));
+	pkt_send_sd_data(state, state->sd_read_bfr);
 	return ret;
 }
 
@@ -507,15 +499,10 @@ static int sd_net_set_buffer_offset(struct sd *state, int arg) {
 
 static int sd_net_get_buffer_offset(struct sd *state, int arg) {
 	char line[256];
-	uint8_t data[5];
-	int val = htonl(state->sd_write_buffer_offset);
 	snprintf(line, sizeof(line)-1, "Buffer offset: %d\n",
 		 state->sd_write_buffer_offset);
 	net_write_line(state, line);
-
-	data[0] = NET_DATA_BUFFER_OFFSET;
-	memcpy(data+1, &val, sizeof(val));
-	net_write_data(state, data, sizeof(data));
+	pkt_send_buffer_offset(state, 2, state->sd_write_buffer_offset);
 	return 0;
 }
 
@@ -525,10 +512,7 @@ static int sd_net_set_buffer_value(struct sd *state, int arg) {
 }
 
 static int sd_net_get_buffer_contents(struct sd *state, int arg) {
-	char buffer[513];
-	buffer[0] = NET_DATA_BUFFER_CONTENTS;
-	memcpy(buffer+1, state->sd_write_bfr, sizeof(state->sd_write_bfr));
-	net_write_data(state, buffer, sizeof(buffer));
+	pkt_send_buffer_contents(state, 2, state->sd_write_bfr);
 	return 0;
 }
 

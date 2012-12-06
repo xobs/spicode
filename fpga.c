@@ -174,13 +174,13 @@ int fpga_read_data(struct sd *sd) {
 		uint8_t val;
                 regnum = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
 		val = ((pkt[5] & 0xf0) >> 4) | ((pkt[6] & 0x03) << 4);
-		return pkt_send_sd_cmd_arg(sd, fpga_counter, regnum, val);
+		return pkt_send_sd_cmd_arg_fpga(sd, fpga_counter, regnum, val);
 	}
 
 	else if (pkt_type == PKT_SD_RESPONSE) {
 		uint8_t val;
                 val = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
-		return pkt_send_sd_response(sd, fpga_counter, val);
+		return pkt_send_sd_response_fpga(sd, fpga_counter, val);
 	}
 	else {
 		uint32_t err = MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_UNKNOWN_PKT, pkt_type);
