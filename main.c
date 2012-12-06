@@ -299,7 +299,6 @@ int main(int argc, char **argv) {
 		struct pollfd handles[3];
 
 		/* Drain the FPGA buffer, if it's not empty */
-		usleep(3);
 		if (fpga_data_avail(&server)) {
 			fpga_read_data(&server);
 			continue;
