@@ -128,8 +128,8 @@ struct sd {
 	/* Number of times FPGA clock has wrapped */
 	uint32_t		fpga_reset_clock;
 	int			fpga_wraps;
-	uint32_t		fpga_wrap_pin;
-	int			fpga_wrap_fd;
+	uint32_t		fpga_overflow_pin;
+	uint32_t		fpga_overflow_pin_value;
 	uint32_t		fpga_clock_ticks;
 };
 
@@ -179,7 +179,7 @@ int fpga_get_new_sample(struct sd *st, uint8_t data[13]);
 int fpga_read_data(struct sd *st);
 int fpga_ready_fd(struct sd *st);
 int fpga_overflow_fd(struct sd *st);
-int fpga_tick_clock(struct sd *sd);
+int fpga_tick_clock_maybe(struct sd *sd);
 int fpga_reset_ticks(struct sd *sd);
 uint32_t fpga_ticks(struct sd *sd);
 

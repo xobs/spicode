@@ -328,11 +328,8 @@ int main(int argc, char **argv) {
 			fprintf(stderr, "Got NAND data\n");
 			fpga_read_data(&server);
 		}
-#warning Check to see if the tick value has changed here
-		if (handles[2].revents & POLLPRI) {
+		if (fpga_tick_clock_maybe(&server))
 			fprintf(stderr, "Clock wrapped\n");
-			fpga_tick_clock(&server);
-		}
 	}
 	net_deinit(&server);
 	parse_deinit(&server);

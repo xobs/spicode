@@ -114,13 +114,16 @@ int fpga_init(struct sd *sd) {
 	if (sd->fpga_ready_fd == -1)
 		return -1;
 
-	gpio_export(CLOCK_OVERFLOW_PIN);
-	gpio_set_direction(CLOCK_OVERFLOW_PIN, GPIO_IN);
-	gpio_set_edge(CLOCK_OVERFLOW_PIN, GPIO_EDGE_BOTH);
-	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, CLOCK_OVERFLOW_PIN);
+	sd->fpga_overflow_pin = CLOCK_OVERFLOW_PIN;
+	gpio_export(sd->fpga_overflow_pin);
+	gpio_set_direction(sd->fpga_overflow_pin, GPIO_IN);
+	gpio_set_edge(sd->fpga_overflow_pin, GPIO_EDGE_BOTH);
+	snprintf(str, sizeof(str)-1, "%s/gpio%d/value", GPIO_PATH, sd->fpga_overflow_pin);
 	sd->fpga_overflow_fd = open(str, O_RDONLY | O_NONBLOCK);
 	if (sd->fpga_overflow_fd == -1)
 		return -1;
+	sd->fpga_overflow_pin_value = gpio_get_value(sd->fpga_overflow_pin);
+
 
 	for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++) {
 		gpio_export(data_pins[i]);
@@ -210,8 +213,14 @@ int fpga_reset_ticks(struct sd *sd) {
 	return 0;
 }
 
-int fpga_tick_clock(struct sd *sd) {
-	sd->fpga_clock_ticks++;
+int fpga_tick_clock_maybe(struct sd *sd) {
+	int new;
+	new = gpio_get_value(sd->fpga_overflow_pin);
+	if (new != sd->fpga_overflow_pin_value) {
+		sd->fpga_clock_ticks++;
+		sd->fpga_overflow_pin_value = new;
+		return 1;
+	}
 	return 0;
 }
 
