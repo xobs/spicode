@@ -87,8 +87,8 @@ static int pkt_set_header_fpga(struct sd *sd, char *pkt, uint32_t fpga_counter, 
 /* PKT_ERROR
  *  Offset | Size | Description
  * --------+------+-------------
- *     0   | 11   | Header
- *    11   |  4   | Error code
+ *     0   |  11  | Header
+ *    11   |   4  | Error code
  *    15   | 512  | Textual error message (NULL-padded)
  */
 int pkt_send_error(struct sd *sd, uint32_t code, char *msg) {
