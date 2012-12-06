@@ -45,6 +45,8 @@
 /* Time out after 250 ms, in order to check for e.g. FPGA data available */
 #define POLL_TIMEOUT 250
 
+
+/*
 static const unsigned int tran_exp[] = {
         10000,          100000,         1000000,        10000000,
         0,              0,              0,              0
@@ -115,12 +117,8 @@ static void print_csd(void *csd_data) {
 	struct sd_csd *csd = &csd_val;
 	uint8_t *data = csd_data;
 
-	//csd->c_size = be16toh(csd->c_size);
-
-        /*
-         * We only understand CSD structure v1.1 and v1.2.
-         * v1.2 has extra information in bits 15, 11 and 10.
-         */
+        // We only understand CSD structure v1.1 and v1.2.
+        // v1.2 has extra information in bits 15, 11 and 10.
         if (csd->csd_structure != 1 && csd->csd_structure != 2)
 		printf("Warning: Unrecognized CSD structure version %d\n", csd->csd_structure);
 	else
@@ -158,7 +156,9 @@ static void print_csd(void *csd_data) {
 	printf("    blocknr: %d\n", blocknr);
 	printf("    capacity: %d\n", blocknr * block_len);
 }
+*/
 
+/*
 struct sd_cid {
 	uint32_t mid;
 	uint16_t oid;
@@ -191,7 +191,7 @@ static void print_cid(void *cid) {
 	sd_cid.month	= data[14] & 0x0f;
 	sd_cid.year	= ((data[14] & 0xf0)>>4) | ((data[13] & 0x01) << 4);
 
-	sd_cid.year  += 2000; /* SD cards year offset */
+	sd_cid.year  += 2000; // SD cards year offset
 
 	printf("    manfid: 0x%02x\n", sd_cid.mid);
 	printf("    oemid: 0x%04x\n", sd_cid.oid);
@@ -207,7 +207,7 @@ static void print_cid(void *cid) {
 	printf("    month: %d\n", sd_cid.month);
 	printf("    year: %d\n", sd_cid.year);
 }
-
+*/
 
 
 static int set_binmode(struct sd *server, int arg) {
