@@ -17,33 +17,33 @@ static int do_help(struct sd *server, int arg);
 #define HELP_BLANK_LINE    {"  ", 0, "", do_help},
 
 static struct sd_syscmd __cmds[] = {
-    {"rc", 0, "Resets card, counters, and buffers"},
-    {"bm", 0, "Switches to binary network mode"},
-    {"lm", 0, "Switches to line network mode"},
+    {"rc", 0, "Reset card, counters, and buffers"},
+    {"bm", 0, "Switch to binary network mode"},
+    {"lm", 0, "Switch to line network mode"},
     {"  ", 0, "", do_help},
     HELP_BLANK_LINE
 
-    {"ci", 0, "Returns card CID"},
-    {"cs", 0, "Returns card CSD"},
+    {"ci", 0, "Return card CID"},
+    {"cs", 0, "Return card CSD"},
     HELP_BLANK_LINE
 
-    {"so", CMD_FLAG_ARG, "Sets sector offset to arg"},
-    {"sz", CMD_FLAG_ARG, "Sets sector size to arg"},
-    {"go", 0, "Gets sector offset"},
-    {"gz", 0, "Gets sector size"},
+    {"so", CMD_FLAG_ARG, "Set sector offset to arg"},
+    {"sz", CMD_FLAG_ARG, "Set sector size to arg"},
+    {"go", 0, "Get sector offset"},
+    {"gz", 0, "Get sector size"},
     HELP_BLANK_LINE
 
-    {"rs", 0, "Reads from current sector"},
-    {"ws", 0, "Writes to current sector"},
+    {"rs", 0, "Read from current sector"},
+    {"ws", 0, "Write to current sector"},
     HELP_BLANK_LINE
 
-    {"rb", 0, "Resets write buffer pointer to offset 0"},
-    {"sb", CMD_FLAG_ARG, "Sets write buffer value to arg and increments the pointer"},
-    {"bp", 0, "Returns write buffer pointer offset"},
-    {"bo", CMD_FLAG_ARG, "Sets the buffer pointer offset to the specified arg"},
-    {"bc", 0, "Returns write buffer contents"},
-    {"cb", 0, "Copies the read buffer to the write buffer"},
-    {"ps", CMD_FLAG_ARG, "Sets pattern seed to arg"},
+    {"rb", 0, "Reset write buffer pointer to offset 0"},
+    {"sb", CMD_FLAG_ARG, "Set write buffer value to arg and increment the pointer"},
+    {"bp", 0, "Get write buffer pointer offset"},
+    {"bo", CMD_FLAG_ARG, "Set write buffer pointer offset to the specified arg"},
+    {"bc", 0, "Return write buffer contents"},
+    {"cb", 0, "Copy read buffer contents to write buffer"},
+    {"ps", CMD_FLAG_ARG, "Select the pattern set specified in arg"},
     HELP_BLANK_LINE
 
     {"c+", 0, "Enable clock auto-tick"},
@@ -57,11 +57,11 @@ static struct sd_syscmd __cmds[] = {
     {"r2", CMD_FLAG_ARG, "Set SD register 2 to arg value"},
     {"r3", CMD_FLAG_ARG, "Set SD register 3 to arg value"},
     {"cd", CMD_FLAG_ARG, "Send raw SD command specified by the arg"},
-    {"rr", 0, "Resets register values to 0"},
+    {"rr", 0, "Reset register values to 0"},
     HELP_BLANK_LINE
 
-    {"p-", 0, "Turns card power off"},
-    {"p+", 0, "Turns card power on and resets card"},
+    {"p-", 0, "Turn card power off"},
+    {"p+", 0, "Turn card power on and reset card"},
     HELP_BLANK_LINE
 
     {"ip", CMD_FLAG_ARG, "Set destination IPv4 address to arg"},
@@ -70,7 +70,6 @@ static struct sd_syscmd __cmds[] = {
 
     {"he", 0, "Print this help message", do_help},
     {"??", 0, "Print this help message", do_help},
-    {"?\0", 0, "Print this help message", do_help},
     {"\0\0", 0, NULL},
 };
 
