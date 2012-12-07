@@ -445,7 +445,7 @@ static int sd_net_write_current_sector(struct sd *state, int arg) {
 }
 
 static int sd_net_set_current_sector(struct sd *state, int arg) {
-	state->sd_sector = ntohl(arg);
+	state->sd_sector = arg;
 	return 0;
 }
 
