@@ -39,7 +39,7 @@ Brief Command Set Explanation
 -----------------------------
 
 To get a list of commands, type "??" or "help".  The major commands are
-described here.  A command will have a '*' next to it in the help screen if
+described here.  A command will have a '\*' next to it in the help screen if
 it is not yet implemented.
 
 "rc" -- Reset the card and reinitialize it.  This must be the first command
@@ -74,23 +74,21 @@ offset.  Use this for changing individual bytes in the write buffer.
 sector offset.
 
 
-Data Channel Format
--------------------
+Pattern Selector
+----------------
 
-The data channel data is subject to change, and likely will change in order
-to accommodate more data such as timestamps and sequence numbers.
+In order to simplify reproducibility, it is possible to use the "ps" command
+to select a predefined pattern.  The following are defined patterns.  Using
+any undefined pattern will produce an undefined result:
 
-All packets start with an identifier, based on the following enum in sd.h:
+00000000 - All zeroes
 
-    enum net_data_types {
-        NET_DATA_UNKNOWN = 0,
-        NET_DATA_NAND = 1,
-        NET_DATA_SD = 2,
-        NET_DATA_CMD = 3,
-        NET_DATA_BUFFER_OFFSET = 4,
-        NET_DATA_BUFFER_CONTENTS = 5,
-    };
+00000001 - All ones
 
-The remaineder of the packet is type-dependent.  For example, NET_DATA_SD
-will contain an additional 512 bytes (for a total of 513), and
-NET_DATA_NAND will contain an additional two bytes (for a total of three).
+00000002 - Walking zeroes (8-bit)
+00000003 - Walking zeroes (16-bit)
+00000004 - Walking zeroes (32-bit)
+
+00000005 - Walking ones (8-bit)
+00000006 - Walking ones (16-bit)
+00000007 - Walking ones (32-bit)

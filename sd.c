@@ -523,6 +523,48 @@ static int sd_net_copy_read_to_write_buffer(struct sd *state, int arg) {
 	return 0;
 }
 
+static int sd_net_pattern_select(struct sd *state, int arg) {
+	int i;
+
+	/* All zeroes */
+	if (arg == 0) {
+		memset(state->sd_write_bfr, 0, sizeof(state->sd_write_bfr));
+	}
+
+	/* All ones */
+	else if (arg == 1) {
+		memset(state->sd_write_bfr, 0xff, sizeof(state->sd_write_bfr));
+	}
+
+	/* Walking zeroes */
+	else if (arg == 2 || arg == 3 || arg == 4) {
+		int max;
+		if (arg == 2)
+			max = 8;
+		else if (arg == 3)
+			max = 16;
+		else
+			max = 32;
+		for (i=0; i<sizeof(state->sd_write_bfr); i++)
+			state->sd_write_bfr[i] = ~(1<<(i&(max-1)));
+	}
+
+	/* Walking ones */
+	else if (arg == 5 || arg == 6 || arg == 7) {
+		int max;
+		if (arg == 5)
+			max = 8;
+		else if (arg == 6)
+			max = 16;
+		else
+			max = 32;
+		for (i=0; i<sizeof(state->sd_write_bfr); i++)
+			state->sd_write_bfr[i] = 1<<(i&(max-1));
+	}
+
+	return 0;
+}
+
 int sd_get_elapsed(struct sd *state, time_t *tv_sec, long *tv_nsec) {
 	struct timespec now;
 	int ret;
@@ -561,6 +603,8 @@ static int install_hooks(struct sd *state) {
 	parse_set_hook(state, "bo", sd_net_set_buffer_offset);
 	parse_set_hook(state, "bc", sd_net_get_buffer_contents);
 	parse_set_hook(state, "cb", sd_net_copy_read_to_write_buffer);
+
+	parse_set_hook(state, "ps", sd_net_pattern_select);
 	return 0;
 }
 
