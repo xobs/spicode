@@ -326,7 +326,8 @@ int main(int argc, char **argv) {
 		}
 		if (fpga_data_avail(&server) || (handles[1].revents & POLLPRI)) {
 			fprintf(stderr, "Got NAND data\n");
-			fpga_read_data(&server);
+			while (fpga_data_avail(&server))
+				fpga_read_data(&server);
 		}
 		if (fpga_tick_clock_maybe(&server))
 			fprintf(stderr, "Clock wrapped\n");
