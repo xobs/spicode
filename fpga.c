@@ -51,7 +51,6 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	uint8_t data[16];
 	int bank;
 	int i;
-	usleep(2);
 	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
 	usleep(2);
 	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
@@ -59,7 +58,6 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	for (bank=0; bank<4; bank++) {
 		gpio_set_value(bank_select_pins[0], !!(bank&1));
 		gpio_set_value(bank_select_pins[1], !!(bank&2));
-		usleep(2);
 		for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++)
 			data[i] = gpio_get_value(data_pins[i]);
 		bytes[bank*2+0] = (data[0]<<0)
