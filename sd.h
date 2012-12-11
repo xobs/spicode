@@ -172,6 +172,7 @@ int sd_get_elapsed(struct sd *state, time_t *tv_sec, long *tv_nsec);
 
 enum fpga_errs {
 	FPGA_ERR_UNKNOWN_PKT,
+	FPGA_ERR_OVERFLOW,
 };
 int fpga_init(struct sd *st);
 int fpga_data_avail(struct sd *st);

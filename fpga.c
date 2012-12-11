@@ -44,30 +44,17 @@ static int bank_select_pins[] = {
 #define CLOCK_OVERFLOW_PIN 72
 #define GPIO_PATH "/sys/class/gpio"
 #define GET_NEW_SAMPLE_PIN 54
-#define SAMPLE_READY_PIN 60
+#define DATA_OVERFLOW_PIN 60
 
 
 int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	uint8_t data[16];
-	int tries;
 	int bank;
 	int i;
-	int ret;
 	usleep(2);
 	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
 	usleep(2);
 	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
-
-	ret = -1;
-	for (tries=0; tries<2; tries++) {
-		if (gpio_get_value(SAMPLE_READY_PIN)) {
-			DBG("Gpio went high after %d tries", tries);
-			ret = 0;
-			break;
-		}
-		usleep(1);
-	}
-	DBG("New sample never went ready!");
 
 	for (bank=0; bank<4; bank++) {
 		gpio_set_value(bank_select_pins[0], !!(bank&1));
@@ -93,7 +80,7 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 				| (data[14]<<6)
 				| (data[15]<<7);
 	}
-	return ret;
+	return 0;
 }
 
 int fpga_data_avail(struct sd *st) {
@@ -133,8 +120,8 @@ int fpga_init(struct sd *sd) {
 	gpio_export(GET_NEW_SAMPLE_PIN);
 	gpio_set_direction(GET_NEW_SAMPLE_PIN, GPIO_OUT);
 
-	gpio_export(SAMPLE_READY_PIN);
-	gpio_set_direction(SAMPLE_READY_PIN, GPIO_IN);
+	gpio_export(DATA_OVERFLOW_PIN);
+	gpio_set_direction(DATA_OVERFLOW_PIN, GPIO_IN);
 
 	for (i=0; i<sizeof(bank_select_pins)/sizeof(*bank_select_pins); i++) {
 		gpio_export(bank_select_pins[i]);
@@ -152,6 +139,12 @@ int fpga_read_data(struct sd *sd) {
 		fprintf(stderr, "No data avilable!\n");
 		return -1;
 	}
+
+	if (gpio_get_value(DATA_OVERFLOW_PIN))
+		pkt_send_error(sd,
+			       MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_OVERFLOW, 0),
+			      "FPGA FIFO overflowed");
+
 	
 	/* Obtain the new sample and send it over the wire */
 	fpga_get_new_sample(sd, pkt);
