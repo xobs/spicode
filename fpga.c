@@ -127,6 +127,8 @@ int fpga_init(struct sd *sd) {
 		gpio_set_value(bank_select_pins[i], 0);
 	}
 
+	pthread_mutex_init(&sd->fpga_overflow_mutex, NULL);
+
 	return 0;
 }
 
@@ -200,7 +202,9 @@ int fpga_overflow_fd(struct sd *sd) {
 }
 
 int fpga_reset_ticks(struct sd *sd) {
+	pthread_mutex_lock(&sd->fpga_overflow_mutex);
 	sd->fpga_clock_ticks = 0;
+	pthread_mutex_unlock(&sd->fpga_overflow_mutex);
 	return 0;
 }
 
@@ -208,7 +212,9 @@ int fpga_tick_clock_maybe(struct sd *sd) {
 	int new;
 	new = gpio_get_value(sd->fpga_overflow_pin);
 	if (new != sd->fpga_overflow_pin_value) {
+		pthread_mutex_lock(&sd->fpga_overflow_mutex);
 		sd->fpga_clock_ticks++;
+		pthread_mutex_unlock(&sd->fpga_overflow_mutex);
 		sd->fpga_overflow_pin_value = new;
 		return 1;
 	}
@@ -216,5 +222,9 @@ int fpga_tick_clock_maybe(struct sd *sd) {
 }
 
 uint32_t fpga_ticks(struct sd *sd) {
-	return sd->fpga_clock_ticks;
+	uint32_t ticks;
+	pthread_mutex_lock(&sd->fpga_overflow_mutex);
+	ticks = sd->fpga_clock_ticks;
+	pthread_mutex_unlock(&sd->fpga_overflow_mutex);
+	return ticks;
 }

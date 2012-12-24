@@ -133,6 +133,7 @@ struct sd {
 	uint32_t		fpga_clock_ticks;
 	pthread_t		fpga_overflow_thread;
 	pthread_t		fpga_data_available_thread;
+	pthread_mutex_t		fpga_overflow_mutex;
 };
 
 
