@@ -46,46 +46,6 @@ static int bank_select_pins[] = {
 #define GET_NEW_SAMPLE_PIN 54
 #define DATA_OVERFLOW_PIN 60
 
-
-int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
-	uint8_t data[16];
-	int bank;
-	int i;
-	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
-	usleep(2);
-	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
-
-	for (bank=0; bank<4; bank++) {
-		gpio_set_value(bank_select_pins[0], !!(bank&1));
-		gpio_set_value(bank_select_pins[1], !!(bank&2));
-		for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++)
-			data[i] = gpio_get_value(data_pins[i]);
-		bytes[bank*2+0] = (data[0]<<0)
-				| (data[1]<<1)
-				| (data[2]<<2)
-				| (data[3]<<3)
-				| (data[4]<<4)
-				| (data[5]<<5)
-				| (data[6]<<6)
-				| (data[7]<<7);
-
-		bytes[bank*2+1] = (data[8]<<0)
-				| (data[9]<<1)
-				| (data[10]<<2)
-				| (data[11]<<3)
-				| (data[12]<<4)
-				| (data[13]<<5)
-				| (data[14]<<6)
-				| (data[15]<<7);
-	}
-	return 0;
-}
-
-int fpga_data_avail(struct sd *st) {
-	return gpio_get_value(DATA_READY_PIN);
-}
-
-
 int fpga_init(struct sd *sd) {
 	int i;
 	char str[256];
@@ -132,6 +92,43 @@ int fpga_init(struct sd *sd) {
 	return 0;
 }
 
+int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
+	uint8_t data[16];
+	int bank;
+	int i;
+	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
+	usleep(2);
+	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
+
+	for (bank=0; bank<4; bank++) {
+		gpio_set_value(bank_select_pins[0], !!(bank&1));
+		gpio_set_value(bank_select_pins[1], !!(bank&2));
+		for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++)
+			data[i] = gpio_get_value(data_pins[i]);
+		bytes[bank*2+0] = (data[0]<<0)
+				| (data[1]<<1)
+				| (data[2]<<2)
+				| (data[3]<<3)
+				| (data[4]<<4)
+				| (data[5]<<5)
+				| (data[6]<<6)
+				| (data[7]<<7);
+
+		bytes[bank*2+1] = (data[8]<<0)
+				| (data[9]<<1)
+				| (data[10]<<2)
+				| (data[11]<<3)
+				| (data[12]<<4)
+				| (data[13]<<5)
+				| (data[14]<<6)
+				| (data[15]<<7);
+	}
+	return 0;
+}
+
+int fpga_data_avail(struct sd *st) {
+	return gpio_get_value(DATA_READY_PIN);
+}
 
 int fpga_read_data(struct sd *sd) {
 	uint8_t pkt[8];
@@ -185,7 +182,6 @@ int fpga_read_data(struct sd *sd) {
 		return pkt_send_error(sd, err, errmsg);
 	}
 }
-
 
 int fpga_ready_fd(struct sd *sd) {
 	char bfr[15];
