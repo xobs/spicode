@@ -251,6 +251,58 @@ static int handle_net_command(struct sd *server) {
 
 
 
+static void *clock_overflow_thread(void *arg) {
+	struct sd *server = arg;
+	int ret;
+
+	while (!server->should_exit) {
+		struct pollfd handles[1];
+
+		bzero(handles, sizeof(handles));
+		handles[0].fd     = fpga_overflow_fd(server);
+		handles[0].events = POLLPRI;
+
+		ret = poll(handles, sizeof(handles)/sizeof(*handles), POLL_TIMEOUT);
+		if (ret < 0) {
+			perror("Couldn't poll");
+			return NULL;
+		}
+
+		if (fpga_tick_clock_maybe(server))
+			fprintf(stderr, "Clock wrapped\n");
+	}
+	return NULL;
+}
+
+
+static void *data_available_thread(void *arg) {
+	struct sd *server = arg;
+	int ret;
+
+	while (!server->should_exit) {
+		struct pollfd handles[1];
+
+		bzero(handles, sizeof(handles));
+		handles[0].fd     = fpga_ready_fd(server);
+		handles[0].events = POLLPRI;
+
+		ret = poll(handles, sizeof(handles)/sizeof(*handles), POLL_TIMEOUT);
+		if (ret < 0) {
+			perror("Couldn't poll");
+			return NULL;
+		}
+
+		if (fpga_data_avail(server) || (handles[0].revents & POLLPRI)) {
+			fprintf(stderr, "Got FPGA data, draining...\n");
+			while (fpga_data_avail(server))
+				fpga_read_data(server);
+		}
+	}
+	return NULL;
+}
+
+
+
 int main(int argc, char **argv) {
 	struct sd server;
 	int ret;
@@ -296,18 +348,18 @@ int main(int argc, char **argv) {
 	parse_set_hook(&server, "bm", set_binmode);
 	parse_set_hook(&server, "lm", set_linemode);
 
-
 	parse_write_prompt(&server);
+
+	pthread_create(&server.fpga_overflow_thread, NULL,
+		       clock_overflow_thread, &server);
+	pthread_create(&server.fpga_data_available_thread, NULL,
+		       data_available_thread, &server);
 	while (1) {
-		struct pollfd handles[3];
+		struct pollfd handles[1];
 
 		bzero(handles, sizeof(handles));
 		handles[0].fd     = net_fd(&server);
 		handles[0].events = POLLIN | POLLHUP;
-		handles[1].fd     = fpga_ready_fd(&server);
-		handles[1].events = POLLPRI;
-		handles[2].fd     = fpga_overflow_fd(&server);
-		handles[2].events = POLLPRI;
 
 		ret = poll(handles, sizeof(handles)/sizeof(*handles), POLL_TIMEOUT);
 		if (ret < 0) {
@@ -324,14 +376,8 @@ int main(int argc, char **argv) {
 				break;
 			parse_write_prompt(&server);
 		}
-		if (fpga_data_avail(&server) || (handles[1].revents & POLLPRI)) {
-			fprintf(stderr, "Got NAND data\n");
-			while (fpga_data_avail(&server))
-				fpga_read_data(&server);
-		}
-		if (fpga_tick_clock_maybe(&server))
-			fprintf(stderr, "Clock wrapped\n");
 	}
+	server.should_exit = 1;
 	net_deinit(&server);
 	parse_deinit(&server);
 	return 0;

@@ -131,6 +131,8 @@ struct sd {
 	uint32_t		fpga_overflow_pin;
 	uint32_t		fpga_overflow_pin_value;
 	uint32_t		fpga_clock_ticks;
+	pthread_t		fpga_overflow_thread;
+	pthread_t		fpga_data_available_thread;
 };
 
 
