@@ -1,4 +1,10 @@
-SOURCES=gpio.c sd.c main.c net.c parse.c fpga.c packet.c
+SOURCES=sd.c main.c net.c parse.c fpga.c packet.c
+ifdef USE_KMEM
+SOURCES+=gpio-kmem.c
+else
+SOURCES+=gpio.c
+endif
+
 OBJECTS=$(SOURCES:.c=.o)
 HEADERS=$(wildcard *.h)
 EXEC=spi
