@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/socket.h>
-#include <resolv.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <strings.h>

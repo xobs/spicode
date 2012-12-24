@@ -168,8 +168,8 @@ int sd_get_cid(struct sd *state, uint8_t cid[16]);
 int sd_get_csd(struct sd *state, uint8_t csd[16]);
 int sd_get_sr(struct sd *state, uint8_t sr[6]);
 int sd_set_blocklength(struct sd *state, uint32_t blklen);
-int sd_read_block(struct sd *state, uint32_t offset, void *block, uint32_t count);
-int sd_write_block(struct sd *state, uint32_t offset, const void *block, uint32_t count);
+int sd_read_block(struct sd *state, uint32_t offset, uint8_t *block, uint32_t count);
+int sd_write_block(struct sd *state, uint32_t offset, const uint8_t *block, uint32_t count);
 int sd_get_elapsed(struct sd *state, time_t *tv_sec, long *tv_nsec);
 
 

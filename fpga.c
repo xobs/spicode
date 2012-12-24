@@ -1,3 +1,6 @@
+#define _POSIX_C_SOURCE 20121221L
+#define _XOPEN_SOURCE 700
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -6,6 +9,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
+#include <time.h>
 
 #include "sd.h"
 #include "gpio.h"
@@ -92,12 +96,19 @@ int fpga_init(struct sd *sd) {
 	return 0;
 }
 
+static int my_usleep(long long usecs) {
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = usecs*1000;
+	return nanosleep(&ts, NULL);
+}
+
 int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	uint8_t data[16];
 	int bank;
 	int i;
 	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
-	usleep(2);
+	my_usleep(2);
 	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
 
 	for (bank=0; bank<4; bank++) {

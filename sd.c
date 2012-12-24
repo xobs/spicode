@@ -23,7 +23,8 @@
 
 /-------------------------------------------------------------------------*/
 
-
+#define _POSIX_C_SOURCE 20121221L
+#define _XOPEN_SOURCE 700
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -60,7 +61,7 @@ enum disk_ioctl_arg {
 
 
 #define	INIT_PORT(state)	init_port(state)	/* Initialize MMC control port (CS=H, CLK=L, DI=H, DO=in) */
-#define DLY_US(n)	usleep(n)	/* Delay n microseconds */
+#define DLY_US(n)	my_usleep(n)	/* Delay n microseconds */
 
 #define	CS_H()		gpio_set_value(state->sd_cs, CS_DESEL) /* Set MMC CS "high" */
 #define	CS_L()		gpio_set_value(state->sd_cs, CS_SEL) /* Set MMC CS "low" */
@@ -111,12 +112,19 @@ static uint32_t Stat = STA_NO_INIT;	/* Disk status */
 static uint8_t CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
 
 
+static int my_usleep(long long usecs) {
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = usecs*1000;
+	return nanosleep(&ts, NULL);
+}
+
 static int init_port(struct sd *state) {
         gpio_set_value(state->sd_power, SD_OFF);
 	CS_H();
-	usleep(10000);
+	my_usleep(10000);
         gpio_set_value(state->sd_power, SD_ON);
-	usleep(10000);
+	my_usleep(10000);
 	return 0;
 }
 
@@ -753,11 +761,11 @@ int sd_reset(struct sd *state) {
 int sd_read_block (
 	struct sd *state,	/* Physical drive nmuber (0) */
 	uint32_t sector,	/* Start sector number (LBA) */
-	void *buff,		/* Pointer to the data buffer to store read data */
+	uint8_t *buff,		/* Pointer to the data buffer to store read data */
 	uint32_t count		/* Sector count (1..128) */
 )
 {
-	bzero(buff, count*512);
+	memset(buff, 0, count*512);
 	if (disk_status(state) & STA_NOINIT) return RES_NOTRDY;
 	if (!count) return RES_PARERR;
 	if (!(CardType & CT_BLOCK)) sector *= 512;	/* Convert LBA to byte address if needed */
@@ -804,7 +812,7 @@ void sd_deinit(struct sd **state) {
 int sd_write_block (
 	struct sd *state,
 	uint32_t sector,		/* Start sector number (LBA) */
-	const void *buff,	/* Pointer to the data to be written */
+	const uint8_t *buff,	/* Pointer to the data to be written */
 	uint32_t count			/* Sector count (1..128) */
 )
 {
@@ -841,7 +849,7 @@ int sd_write_block (
 
 int sd_get_csd(struct sd *state, uint8_t *csd) {
 	int ret;
-	bzero(csd, 16);
+	memset(csd, 0, 16);
 	ret = send_cmd(state, CMD9, 0);
 	if (ret)
 		return ret;
@@ -850,7 +858,7 @@ int sd_get_csd(struct sd *state, uint8_t *csd) {
 
 int sd_get_cid(struct sd *state, uint8_t *cid) {
 	int ret;
-	bzero(cid, 16);
+	memset(cid, 0, 16);
 	ret = send_cmd(state, CMD10, 0);
 	if (ret)
 		return ret;
