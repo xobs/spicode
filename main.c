@@ -321,6 +321,12 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
+	ret = i2c_init(&server);
+	if (ret < 0) {
+		perror("Couldn't initialize i2c");
+		return 1;
+	}
+
 	ret = fpga_init(&server);
 	if (ret < 0) {
 		perror("Couldn't initialize NAND");

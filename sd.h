@@ -134,6 +134,10 @@ struct sd {
 	pthread_t		fpga_overflow_thread;
 	pthread_t		fpga_data_available_thread;
 	pthread_mutex_t		fpga_overflow_mutex;
+
+
+	/* I2C (for use with the FPGA) */
+	int			i2c_fpga_fd, i2c_fpga_device, i2c_fpga_bus;
 };
 
 
@@ -186,6 +190,7 @@ int fpga_ready_fd(struct sd *st);
 int fpga_overflow_fd(struct sd *st);
 int fpga_tick_clock_maybe(struct sd *sd);
 int fpga_reset_ticks(struct sd *sd);
+int fpga_ignore_first_packets(struct sd *sd, int count);
 uint32_t fpga_ticks(struct sd *sd);
 
 
@@ -202,6 +207,10 @@ int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset);
 int pkt_send_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
 int pkt_send_command(struct sd *sd, struct sd_cmd *cmd);
 int pkt_send_reset(struct sd *sd);
+
+int i2c_init(struct sd *sd);
+int i2c_set_byte(struct sd *sd, uint8_t addr, uint8_t value);
+int i2c_set_buffer(struct sd *sd, uint8_t addr, uint8_t count, uint8_t *buffer);
 
 
 #endif /* __SD_H__ */
