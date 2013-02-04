@@ -294,7 +294,10 @@ static void *data_available_thread(void *arg) {
 
 		while(fpga_data_avail(server)) {
 			fprintf(stderr, "Got FPGA data, draining...\n");
+			pkt_send_buffer_drain(server, PKT_BUFFER_DRAIN_START);
 			fpga_drain(server);
+			pkt_send_buffer_drain(server, PKT_BUFFER_DRAIN_STOP);
+			fprintf(stderr, "Done draining\n");
 		}
 	}
 	return NULL;
