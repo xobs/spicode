@@ -1,4 +1,4 @@
-SOURCES=sd.c main.c net.c parse.c fpga.c packet.c
+SOURCES=sd.c main.c net.c parse.c fpga.c packet.c i2c.c
 ifdef USE_KMEM
 SOURCES+=gpio-kmem.c
 else
