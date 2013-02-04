@@ -110,12 +110,16 @@ int fpga_init(struct sd *sd) {
 }
 
 int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
-	uint8_t data[16];
+	uint8_t data[sizeof(data_pins)/sizeof(*data_pins)];
+	static uint8_t last_data[8];
 	int bank;
 	int i;
+	static int repeat_count;
 
-	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
-	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
+	/* Load the next sample */
+	st->fpga_read = !st->fpga_read;
+	gpio_set_value(GET_NEW_SAMPLE_PIN, st->fpga_read);
+
 	for (bank=0; bank<4; bank++) {
 		gpio_set_value(bank_select_pins[0], !!(bank&1));
 		gpio_set_value(bank_select_pins[1], !!(bank&2));
@@ -139,6 +143,13 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 				| (data[14]<<6)
 				| (data[15]<<7);
 	}
+
+	if (!memcmp(last_data, bytes, sizeof(last_data))) {
+		fprintf(stderr, "Got duplicate packet - %d in a row\n", ++repeat_count);
+		return fpga_get_new_sample(st, bytes);
+	}
+	memcpy(last_data, bytes, sizeof(last_data));
+	repeat_count = 0;
 	return 0;
 }
 
