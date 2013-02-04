@@ -19,7 +19,6 @@ static struct sd_syscmd __cmds[] = {
     {"rc", 0, "Reset card, counters, and buffers"},
     {"bm", 0, "Switch to binary network mode"},
     {"lm", 0, "Switch to line network mode"},
-    {"  ", 0, "", do_help},
     HELP_BLANK_LINE
 
     {"ci", 0, "Return card CID"},
