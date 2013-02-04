@@ -24,6 +24,7 @@ enum PacketType {
 	PACKET_BUFFER_CONTENTS = 9,
 	PACKET_COMMAND = 10,
 	PACKET_RESET = 11,
+	PACKET_BUFFER_DRAIN = 12,
 };
 
 
@@ -304,5 +305,20 @@ int pkt_send_reset(struct sd *sd) {
 	char pkt[PKT_HEADER_SIZE+1];
 	pkt_set_header(sd, pkt, PACKET_RESET, sizeof(pkt));
 	pkt[PKT_HEADER_SIZE+0] = PKT_VERSION_NUMBER;
+	return net_write_data(sd, pkt, sizeof(pkt));
+}
+
+
+/*
+ * PACKET_BUFFER_DRAIN format (CPU):
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  11  | Header
+ *    11   |   1  | 1 if it's a buffer drain start, 2 if it's an end
+ */
+int pkt_send_buffer_drain(struct sd *sd, uint8_t start_stop) {
+	char pkt[PKT_HEADER_SIZE+1];
+	pkt_set_header(sd, pkt, PACKET_BUFFER_DRAIN, sizeof(pkt));
+	pkt[PKT_HEADER_SIZE+0] = start_stop;
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
