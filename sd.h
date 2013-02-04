@@ -71,6 +71,15 @@ enum sd_parse_mode {
     PARSE_MODE_LINE,
 };
 
+enum cmd_flags {
+	CMD_FLAG_ARG = 1, /* True if the command has an arg */
+};
+
+enum buffer_drain_start_stop {
+	PKT_BUFFER_DRAIN_START = 1,
+	PKT_BUFFER_DRAIN_STOP = 2,
+};
+
 struct sd;
 
 struct sd_syscmd {
@@ -134,15 +143,11 @@ struct sd {
 	pthread_t		fpga_overflow_thread;
 	pthread_t		fpga_data_available_thread;
 	pthread_mutex_t		fpga_overflow_mutex;
+	int			fpga_read;
 
 
 	/* I2C (for use with the FPGA) */
 	int			i2c_fpga_fd, i2c_fpga_device, i2c_fpga_bus;
-};
-
-
-enum cmd_flags {
-	CMD_FLAG_ARG = 1, /* True if the command has an arg */
 };
 
 int parse_init(struct sd *server);
@@ -207,10 +212,12 @@ int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset);
 int pkt_send_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
 int pkt_send_command(struct sd *sd, struct sd_cmd *cmd);
 int pkt_send_reset(struct sd *sd);
+int pkt_send_buffer_drain(struct sd *sd, uint8_t start_stop);
 
 int i2c_init(struct sd *sd);
 int i2c_set_byte(struct sd *sd, uint8_t addr, uint8_t value);
-int i2c_set_buffer(struct sd *sd, uint8_t addr, uint8_t count, uint8_t *buffer);
-
+int i2c_set_buffer(struct sd *sd, uint8_t addr, uint8_t count, void *buf);
+int i2c_get_buffer(struct sd *sd, uint8_t addr, uint8_t count, void *buf);
+int i2c_get_byte(struct sd *sd, uint8_t addr);
 
 #endif /* __SD_H__ */

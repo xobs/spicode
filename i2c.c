@@ -23,14 +23,14 @@ int i2c_init(struct sd *sd) {
 	return 0;
 }
 
-int i2c_set_buffer(struct sd *sd, uint8_t addr, uint8_t count, uint8_t *buffer) {
+int i2c_set_buffer(struct sd *sd, uint8_t addr, uint8_t count, void *buf) {
 	uint8_t data[count+1];
 	struct i2c_rdwr_ioctl_data packets;
 	struct i2c_msg messages[1];
 
 	// Set the address we'll read to the start address.
 	data[0] = addr;
-	memcpy(data+1, buffer, count);
+	memcpy(data+1, buf, count);
 
 	messages[0].addr = sd->i2c_fpga_device;
 	messages[0].flags = 0;
@@ -51,4 +51,38 @@ int i2c_set_buffer(struct sd *sd, uint8_t addr, uint8_t count, uint8_t *buffer) 
 
 int i2c_set_byte(struct sd *sd, uint8_t addr, uint8_t value) {
 	return i2c_set_buffer(sd, addr, 1, &value);
+}
+
+
+int i2c_get_buffer(struct sd *sd, uint8_t addr, uint8_t count, void *buf) {
+	struct i2c_rdwr_ioctl_data packets;
+	struct i2c_msg messages[2];
+
+	memset(buf, 0, count);
+
+	messages[0].addr = sd->i2c_fpga_device;
+	messages[0].flags = 0;
+	messages[0].len = sizeof(addr);
+	messages[0].buf = &addr;
+
+	messages[1].addr = sd->i2c_fpga_device;
+	messages[1].flags = I2C_M_RD;
+	messages[1].len = count;
+	messages[1].buf = (void *)buf;
+
+	packets.msgs = messages;
+	packets.nmsgs = 2;
+
+	if(ioctl(sd->i2c_fpga_fd, I2C_RDWR, &packets) < 0) {
+		perror("Unable to communicate with i2c device");
+		return 1;
+	}
+
+	return 0;
+}
+
+int i2c_get_byte(struct sd *sd, uint8_t addr) {
+	uint8_t value;
+	i2c_get_buffer(sd, addr, 1, &value);
+	return value;
 }
