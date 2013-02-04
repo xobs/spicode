@@ -53,6 +53,14 @@ static int bank_select_pins[] = {
 // When we drain the FPGA, store this many packets max
 #define MAX_PACKETS 1000000
 
+
+static int set_ignore_blocks(struct sd *sd, int arg) {
+	uint8_t buffer[4];
+	arg = htonl(arg);
+	memcpy(buffer, &arg, sizeof(buffer));
+	return i2c_set_buffer(sd, 0x10, sizeof(buffer), buffer);
+}
+
 int fpga_init(struct sd *sd) {
 	int i;
 	char str[256];
@@ -95,6 +103,8 @@ int fpga_init(struct sd *sd) {
 	}
 
 	pthread_mutex_init(&sd->fpga_overflow_mutex, NULL);
+	
+	parse_set_hook(sd, "ib", set_ignore_blocks);
 
 	return 0;
 }
@@ -266,3 +276,4 @@ uint32_t fpga_ticks(struct sd *sd) {
 	pthread_mutex_unlock(&sd->fpga_overflow_mutex);
 	return ticks;
 }
+

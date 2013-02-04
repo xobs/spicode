@@ -43,6 +43,7 @@ static struct sd_syscmd __cmds[] = {
     {"bc", 0, "Return write buffer contents"},
     {"cb", 0, "Copy read buffer contents to write buffer"},
     {"ps", CMD_FLAG_ARG, "Select the pattern set specified in arg"},
+    {"ib", CMD_FLAG_ARG, "Ignore the first [arg] packets"},
     HELP_BLANK_LINE
 
     {"c+", 0, "Enable clock auto-tick"},
