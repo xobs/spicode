@@ -292,10 +292,9 @@ static void *data_available_thread(void *arg) {
 			return NULL;
 		}
 
-		if (fpga_data_avail(server) || (handles[0].revents & POLLPRI)) {
+		while(fpga_data_avail(server)) {
 			fprintf(stderr, "Got FPGA data, draining...\n");
-			while (fpga_data_avail(server))
-				fpga_read_data(server);
+			fpga_drain(server);
 		}
 	}
 	return NULL;

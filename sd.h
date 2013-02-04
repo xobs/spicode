@@ -179,7 +179,8 @@ enum fpga_errs {
 };
 int fpga_init(struct sd *st);
 int fpga_data_avail(struct sd *st);
-int fpga_get_new_sample(struct sd *st, uint8_t data[13]);
+int fpga_drain(struct sd *st);
+int fpga_get_new_sample(struct sd *st, uint8_t data[8]);
 int fpga_read_data(struct sd *st);
 int fpga_ready_fd(struct sd *st);
 int fpga_overflow_fd(struct sd *st);

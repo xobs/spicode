@@ -15,10 +15,8 @@ static volatile char  *mem_8  = 0;
 static int *prev_mem_range = 0;
 
 #define GPIO_PATH "/sys/class/gpio"
- 
-static int read_kernel_memory(long offset, int virtualized, int size) {
-    int result;
 
+static int map_offset(long offset, int virtualized) {
     int *mem_range = (int *)(offset & ~0xFFFF);
     if( mem_range != prev_mem_range ) {
         prev_mem_range = mem_range;
@@ -58,7 +56,12 @@ static int read_kernel_memory(long offset, int virtualized, int size) {
         mem_16 = (short *)mem_32;
         mem_8  = (char  *)mem_32;
     }
-
+    return 0;
+}
+ 
+static volatile int read_kernel_memory(long offset, int virtualized, int size) {
+    int result;
+    map_offset(offset, virtualized);
     int scaled_offset = (offset-(offset&~0xFFFF));
     if(size==1)
         result = mem_8[scaled_offset/sizeof(char)];
@@ -80,6 +83,36 @@ static int write_kernel_memory(long offset, long value, int virtualized, int siz
     else
         mem_32[scaled_offset/sizeof(long)]  = value;
     return old_value;
+}
+
+static int overwrite_kernel_memory(long offset, long value, int virtualized, int size) {
+    map_offset(offset, virtualized);
+    int scaled_offset = (offset-(offset&~0xFFFF));
+    if(size==1)
+        mem_8[scaled_offset/sizeof(char)]   = value;
+    else if(size==2)
+        mem_16[scaled_offset/sizeof(short)] = value;
+    else
+        mem_32[scaled_offset/sizeof(long)]  = value;
+    return 0;
+}
+
+volatile int gpio_get_bank(int bank) {
+	uint32_t base;
+
+	if (bank == 0)
+		base = 0xd4019000;
+	else if (bank == 1)
+		base = 0xd4019004;
+	else if (bank == 2)
+		base = 0xd4019008;
+	else if (bank == 3)
+		base = 0xd4019100;
+	else {
+		fprintf(stderr, "Invalid GPIO bank: %d\n", bank);
+		return -1;
+	}
+	return read_kernel_memory(base, 0, 4);
 }
 
 int gpio_export(int gpio) {
@@ -128,7 +161,7 @@ int gpio_set_value(int gpio, int value) {
 	else
 		offset = 0x0024;
 
-	write_kernel_memory(offset+base, 1<<(gpio&0x1f), 0, 4);
+	overwrite_kernel_memory(offset+base, 1<<(gpio&0x1f), 0, 4);
 	return 0;
 }
 

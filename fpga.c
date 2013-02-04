@@ -50,6 +50,9 @@ static int bank_select_pins[] = {
 #define GET_NEW_SAMPLE_PIN 54
 #define DATA_OVERFLOW_PIN 60
 
+// When we drain the FPGA, store this many packets max
+#define MAX_PACKETS 1000000
+
 int fpga_init(struct sd *sd) {
 	int i;
 	char str[256];
@@ -96,21 +99,13 @@ int fpga_init(struct sd *sd) {
 	return 0;
 }
 
-static int my_usleep(long long usecs) {
-	struct timespec ts;
-	ts.tv_sec = 0;
-	ts.tv_nsec = usecs*1000;
-	return nanosleep(&ts, NULL);
-}
-
 int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	uint8_t data[16];
 	int bank;
 	int i;
-	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
-	my_usleep(2);
-	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
 
+	gpio_set_value(GET_NEW_SAMPLE_PIN, 0);
+	gpio_set_value(GET_NEW_SAMPLE_PIN, 1);
 	for (bank=0; bank<4; bank++) {
 		gpio_set_value(bank_select_pins[0], !!(bank&1));
 		gpio_set_value(bank_select_pins[1], !!(bank&2));
@@ -141,25 +136,10 @@ int fpga_data_avail(struct sd *st) {
 	return gpio_get_value(DATA_READY_PIN);
 }
 
-int fpga_read_data(struct sd *sd) {
-	uint8_t pkt[8];
-	if (!fpga_data_avail(sd)) {
-		fprintf(stderr, "No data avilable!\n");
-		return -1;
-	}
 
-	if (gpio_get_value(DATA_OVERFLOW_PIN))
-		pkt_send_error(sd,
-			       MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_OVERFLOW, 0),
-			      "FPGA FIFO overflowed");
-
-	
-	/* Obtain the new sample and send it over the wire */
-	fpga_get_new_sample(sd, pkt);
-
-	uint32_t fpga_counter;
+static int fpga_send_packet(struct sd *sd, uint8_t *pkt) {
 	uint8_t pkt_type;
-
+	uint32_t fpga_counter;
 	memcpy(&fpga_counter, pkt, sizeof(fpga_counter));
 	pkt_type = pkt[4] & 0x0f;
 
@@ -167,7 +147,7 @@ int fpga_read_data(struct sd *sd) {
 		uint8_t data;
 		uint8_t ctrl;
 		uint8_t unknown[2];
-                data = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
+		data = ((pkt[4] & 0xf0) >> 4) | ((pkt[5] & 0x0f) << 4);
 		ctrl = ((pkt[5] & 0xf0) >> 4) | ((pkt[6] & 0x03) << 4);
 		unknown[0] = ((pkt[6] & 0xfc) >> 2) | ((pkt[7] & 0x03) << 6);
 		unknown[1] = ((pkt[7] & 0x0c) >> 2);
@@ -192,6 +172,57 @@ int fpga_read_data(struct sd *sd) {
 		snprintf(errmsg, sizeof(errmsg)-1, "Unrecognized FPGA packet type %d", pkt_type);
 		return pkt_send_error(sd, err, errmsg);
 	}
+}
+
+
+int fpga_read_data(struct sd *sd) {
+	uint8_t pkt[8];
+	if (!fpga_data_avail(sd)) {
+		fprintf(stderr, "No data avilable!\n");
+		return -1;
+	}
+
+	if (gpio_get_value(DATA_OVERFLOW_PIN)) {
+		fprintf(stderr, "FPGA FIFO overflowed\n");
+		pkt_send_error(sd,
+			       MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_OVERFLOW, 0),
+			       "FPGA FIFO overflowed");
+	}
+	
+	/* Obtain the new sample and send it over the wire */
+	fpga_get_new_sample(sd, pkt);
+	return fpga_send_packet(sd, pkt);
+}
+
+int fpga_drain(struct sd *sd) {
+	uint8_t pkt_buffer[MAX_PACKETS][8];
+	uint32_t overflow_times[16384];
+	int packet_offset = 0;
+	int overflow_count = 0;
+	int current_packet;
+
+	for (packet_offset = 0;
+	     packet_offset < MAX_PACKETS && fpga_data_avail(sd);
+	     packet_offset++) {
+		fpga_get_new_sample(sd, pkt_buffer[packet_offset]);
+		if (gpio_get_value(DATA_OVERFLOW_PIN)) {
+			memcpy(&overflow_times[overflow_count++], pkt_buffer[packet_offset], sizeof(uint32_t));
+		}
+	}
+	fprintf(stderr, "Read %d packets\n", packet_offset);
+
+	for (current_packet=0; current_packet<packet_offset; current_packet++)
+		fpga_send_packet(sd, pkt_buffer[current_packet]);
+
+	if (overflow_count) {
+		char errmsg[512];
+		snprintf(errmsg, sizeof(errmsg)-1, "FPGA FIFO overflowed %d times\n", overflow_count);
+		printf(errmsg);
+		pkt_send_error(sd,
+			       MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_OVERFLOW, overflow_count),
+			       errmsg);
+	}
+	return 0;
 }
 
 int fpga_ready_fd(struct sd *sd) {

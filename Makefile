@@ -8,7 +8,7 @@ endif
 OBJECTS=$(SOURCES:.c=.o)
 HEADERS=$(wildcard *.h)
 EXEC=spi
-MY_CFLAGS += -Wall -O0 -g -std=c99 -pedantic -Werror
+MY_CFLAGS += -Wall -O2 -g -std=c99 -pedantic -Werror
 MY_LIBS += -lpthread -lrt
 
 all: $(OBJECTS)
