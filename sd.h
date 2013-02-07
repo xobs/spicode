@@ -8,7 +8,7 @@
 
 #define NET_PORT 7283
 #define NET_DATA_PORT 17283
-#define NET_MAX_CONNECTIONS 20
+#define NET_MAX_CONNECTIONS 1
 #define NET_PROMPT "cmd> "
 #define NET_MAX_TRIES 20
 
@@ -112,13 +112,16 @@ struct sd {
 	int			net_socket;
 	int			net_socket_data;
 	int			net_fd;
+	int			net_fd_data;
 	struct sockaddr_in	net_sockaddr;
 	struct sockaddr_in	net_sockaddr_data;
 	uint32_t		net_buf_len;
+	uint32_t		net_buf_len_data;
 	uint8_t			net_bfr[512];
+	uint8_t			net_bfr_data[512];
 	uint32_t		net_bfr_ptr;
 	int			net_port;
-	int			net_data_port;
+	int			net_port_data;
 
 	struct sd_syscmd	*cmds;
 
