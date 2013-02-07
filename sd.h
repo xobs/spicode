@@ -80,6 +80,11 @@ enum buffer_drain_start_stop {
 	PKT_BUFFER_DRAIN_STOP = 2,
 };
 
+enum cmd_start_stop {
+	CMD_START = 1,
+	CMD_END = 2,
+};
+
 struct sd;
 
 struct sd_syscmd {
@@ -94,7 +99,6 @@ struct sd_cmd {
     uint8_t cmd[2]; /* `\                   */
                     /*    > Network packet  */
     uint32_t arg;   /* ,/                   */
-
 
     struct sd_syscmd *syscmd;
 };
@@ -210,9 +214,11 @@ int pkt_send_sd_cid(struct sd *sd, uint8_t cid[16]);
 int pkt_send_sd_csd(struct sd *sd, uint8_t csd[16]);
 int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset);
 int pkt_send_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer);
-int pkt_send_command(struct sd *sd, struct sd_cmd *cmd);
+int pkt_send_command(struct sd *sd, struct sd_cmd *cmd, uint8_t start_stop);
 int pkt_send_reset(struct sd *sd);
 int pkt_send_buffer_drain(struct sd *sd, uint8_t start_stop);
+int pkt_send_hello(struct sd *sd);
+int pkt_send_cmd_done(struct sd *sd, uint8_t previous_command);
 
 int i2c_init(struct sd *sd);
 int i2c_set_byte(struct sd *sd, uint8_t addr, uint8_t value);

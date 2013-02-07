@@ -25,6 +25,7 @@ enum PacketType {
 	PACKET_COMMAND = 10,
 	PACKET_RESET = 11,
 	PACKET_BUFFER_DRAIN = 12,
+	PACKET_HELLO = 13,
 };
 
 
@@ -281,15 +282,17 @@ int pkt_send_buffer_contents(struct sd *sd, uint8_t buffertype, uint8_t *buffer)
  *     0   |  11  | Header
  *    11   |   2  | Two-character command code
  *    13   |   4  | 32-bit command argument
+ *    14   |   1  | 1 if the command is starting, 2 if it's ending
  */
-int pkt_send_command(struct sd *sd, struct sd_cmd *cmd) {
-	char pkt[PKT_HEADER_SIZE+2+4];
+int pkt_send_command(struct sd *sd, struct sd_cmd *cmd, uint8_t start_stop) {
+	char pkt[PKT_HEADER_SIZE+2+4+1];
 	uint32_t arg;
 	arg = htonl(cmd->arg);
 	pkt_set_header(sd, pkt, PACKET_COMMAND, sizeof(pkt));
 	pkt[PKT_HEADER_SIZE+0] = cmd->cmd[0];
 	pkt[PKT_HEADER_SIZE+1] = cmd->cmd[1];
 	memcpy(pkt+PKT_HEADER_SIZE+2, &arg, sizeof(arg));
+	pkt[PKT_HEADER_SIZE+2+4] = start_stop;
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
 
@@ -320,5 +323,20 @@ int pkt_send_buffer_drain(struct sd *sd, uint8_t start_stop) {
 	char pkt[PKT_HEADER_SIZE+1];
 	pkt_set_header(sd, pkt, PACKET_BUFFER_DRAIN, sizeof(pkt));
 	pkt[PKT_HEADER_SIZE+0] = start_stop;
+	return net_write_data(sd, pkt, sizeof(pkt));
+}
+
+
+/*
+ * PACKET_HELLO format (CPU):
+ *  Offset | Size | Description
+ * --------+------+-------------
+ *     0   |  11  | Header
+ *    11   |   1  | Command stream version number
+ */
+int pkt_send_hello(struct sd *sd) {
+	char pkt[PKT_HEADER_SIZE+1];
+	pkt_set_header(sd, pkt, PACKET_HELLO, sizeof(pkt));
+	pkt[PKT_HEADER_SIZE+0] = PKT_VERSION_NUMBER;
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
