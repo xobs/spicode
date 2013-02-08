@@ -171,6 +171,7 @@ static int real_parse_cmd(struct sd *server, struct sd_cmd *cmd,
         if (!syscmd) {
             errno = EINVAL;
             size_copied = -1;
+            cmd->arg = 0;
         }
         else {
             /* If an arg is required, parse that */
