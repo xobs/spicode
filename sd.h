@@ -136,6 +136,7 @@ struct sd {
 	uint8_t			net_bfr[512];
 	uint32_t		net_bfr_ptr;
 	int			net_port;
+	pthread_mutex_t		net_lock;
 
 	struct sd_syscmd	*cmds;
 

@@ -13,7 +13,11 @@
 #include "sd.h"
 
 int net_write_data(struct sd *server, void *data, size_t count) {
-    return write(server->net_fd, data, count);
+    int ret;
+    pthread_mutex_lock(&server->net_lock);
+    ret = write(server->net_fd, data, count);
+    pthread_mutex_unlock(&server->net_lock);
+    return ret;
 }
 
 int net_fd(struct sd *server) {
