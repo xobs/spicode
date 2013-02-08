@@ -80,6 +80,12 @@ enum buffer_drain_start_stop {
 	PKT_BUFFER_DRAIN_STOP = 2,
 };
 
+enum buffer_number {
+	BUFFER_WRITE = 1,
+	BUFFER_READ = 2,
+	SECTOR_OFFSET = 3,
+};
+
 enum cmd_start_stop {
 	CMD_START = 1,
 	CMD_END = 2,
@@ -103,6 +109,20 @@ struct sd_cmd {
     struct sd_syscmd *syscmd;
 };
 
+enum fpga_errs {
+	FPGA_ERR_UNKNOWN_PKT,
+	FPGA_ERR_OVERFLOW,
+};
+
+enum sd_errs {
+	SD_ERR_CSD,
+	SD_ERR_CID,
+};
+
+enum parse_errs {
+	PARSE_ERR_UNKNOWN_CMD,
+	PARSE_ERR_UNKNOWN,
+};
 
 struct sd {
 	int			should_exit;
@@ -110,18 +130,12 @@ struct sd {
 	enum sd_parse_mode	parse_mode;
 
 	int			net_socket;
-	int			net_socket_data;
 	int			net_fd;
-	int			net_fd_data;
 	struct sockaddr_in	net_sockaddr;
-	struct sockaddr_in	net_sockaddr_data;
 	uint32_t		net_buf_len;
-	uint32_t		net_buf_len_data;
 	uint8_t			net_bfr[512];
-	uint8_t			net_bfr_data[512];
 	uint32_t		net_bfr_ptr;
 	int			net_port;
-	int			net_port_data;
 
 	struct sd_syscmd	*cmds;
 
@@ -168,7 +182,6 @@ int parse_write_prompt(struct sd *server);
 
 int net_init(struct sd *server);
 int net_accept(struct sd *server);
-int net_write_line(struct sd *server, char *txt);
 int net_write_data(struct sd *server, void *data, size_t count);
 int net_get_packet(struct sd *server, uint8_t **data);
 int net_fd(struct sd *server);
@@ -188,11 +201,6 @@ int sd_read_block(struct sd *state, uint32_t offset, uint8_t *block, uint32_t co
 int sd_write_block(struct sd *state, uint32_t offset, const uint8_t *block, uint32_t count);
 int sd_get_elapsed(struct sd *state, time_t *tv_sec, long *tv_nsec);
 
-
-enum fpga_errs {
-	FPGA_ERR_UNKNOWN_PKT,
-	FPGA_ERR_OVERFLOW,
-};
 int fpga_init(struct sd *st);
 int fpga_data_avail(struct sd *st);
 int fpga_drain(struct sd *st);

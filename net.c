@@ -12,13 +12,8 @@
 
 #include "sd.h"
 
-/* Write a line of text out to the text console */
-int net_write_line(struct sd *server, char *txt) {
-    return write(server->net_fd, txt, strlen(txt)+1);
-}
-
 int net_write_data(struct sd *server, void *data, size_t count) {
-    return write(server->net_fd_data, data, count);
+    return write(server->net_fd, data, count);
 }
 
 int net_fd(struct sd *server) {
@@ -75,87 +70,14 @@ int net_accept(struct sd *server) {
                             (struct sockaddr *)&(server->net_sockaddr),
                             &len);
     printf("Connection from %s\n", inet_ntoa(server->net_sockaddr.sin_addr));
-    printf("Awaiting data connection on port %d\n", server->net_port_data);
-    server->net_fd_data = accept(server->net_socket_data,
-                            (struct sockaddr *)&(server->net_sockaddr_data),
-                            &len);
 
     return server->net_fd;
 }
 
-
-int net_set_data_port(struct sd *server, int port) {
-    server->net_sockaddr_data.sin_port = htons(port);
-    return 0;
-}
-
-int net_set_data_addr(struct sd *server, int addr) {
-    server->net_sockaddr_data.sin_addr.s_addr = htonl(addr);
-    return 0;
-}
-
-
-static int net_init_data(struct sd *server) {
+static int net_init_socket(struct sd *server) {
     int res;
     int val;
     socklen_t len;
-
-    /* Set up the TCP channel */
-    server->net_socket_data = socket(AF_INET, SOCK_STREAM, 0);
-    if (server->net_socket_data < 0) {
-        perror("Couldn't call socket()");
-        return -1;
-    }
-
-    bzero(&server->net_sockaddr_data, sizeof(server->net_sockaddr_data));
-    server->net_sockaddr_data.sin_family = AF_INET;
-    server->net_sockaddr_data.sin_port = htons(server->net_port_data);
-    server->net_sockaddr_data.sin_addr.s_addr = INADDR_ANY;
-
-    res = bind(server->net_socket_data,
-              (struct sockaddr *)&(server->net_sockaddr_data),
-              sizeof(server->net_sockaddr_data));
-    if (res != 0) {
-        close(server->net_socket_data);
-        perror("Couldn't call bind()");
-        return -1;
-    }
-
-    res = listen(server->net_socket_data, NET_MAX_CONNECTIONS);
-    if (res != 0) {
-        perror("Couldn't call listen()");
-        close(server->net_socket_data);
-        return -1;
-    }
-
-    len = sizeof(server->net_buf_len_data);
-    getsockopt(server->net_socket_data, SOL_SOCKET, SO_RCVBUF,
-              &server->net_buf_len_data, &len);
-
-    len = sizeof(val);
-    val = 1;
-    setsockopt(server->net_socket_data, SOL_SOCKET, SO_REUSEADDR, &val, len);
-
-/*
-    len = sizeof(val);
-    val = 1;
-    setsockopt(server->net_socket_data, IPPROTO_TCP, TCP_NODELAY, (char *)&val, len);
-*/
-
-    return 0;
-}
-
-
-int net_init(struct sd *server) {
-    int res;
-    int val;
-    socklen_t len;
-
-    server->net_port_data = NET_DATA_PORT;
-    server->net_port = NET_PORT;
-
-    parse_set_hook(server, "up", net_set_data_port);
-    parse_set_hook(server, "ip", net_set_data_addr);
 
     /* Set up the TCP channel */
     server->net_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -191,11 +113,18 @@ int net_init(struct sd *server) {
 
     len = sizeof(val);
     val = 1;
-    setsockopt(server->net_socket, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+    setsockopt(server->net_socket, SOL_SOCKET, SO_REUSEADDR, &val, len);
 
+    return 0;
+}
+
+
+int net_init(struct sd *server) {
+
+    server->net_port = NET_DATA_PORT;
 
     /* Set up UDP data channel */
-    return net_init_data(server);
+    return net_init_socket(server);
 }
 
 int net_deinit(struct sd *server) {

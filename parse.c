@@ -11,9 +11,9 @@
 
 #include "sd.h"
 
-static int do_help(struct sd *server, int arg);
+static int do_unknown_cmd(struct sd *server, int arg);
 
-#define HELP_BLANK_LINE    {"  ", 0, "", do_help},
+#define HELP_BLANK_LINE    {"  ", 0, "", do_unknown_cmd},
 
 static struct sd_syscmd __cmds[] = {
     {"rc", 0, "Reset card, counters, and buffers"},
@@ -66,35 +66,18 @@ static struct sd_syscmd __cmds[] = {
     {"ip", CMD_FLAG_ARG, "Set destination IPv4 address to arg"},
     {"up", CMD_FLAG_ARG, "Set destination UDP port to arg"},
     HELP_BLANK_LINE
-
-    {"he", 0, "Print this help message", do_help},
-    {"??", 0, "Print this help message", do_help},
     {"\0\0", 0, NULL},
 };
 
-static int do_help(struct sd *server, int arg) {
-    struct sd_syscmd *c = server->cmds;
-    net_write_line(server, "Commands:\n");
-    while (c->description) {
-        char help_line[512];
-        snprintf(help_line, sizeof(help_line)-1, "    %c%c %s %c %s\n", 
-                c->cmd[0], c->cmd[1], (c->flags&CMD_FLAG_ARG)?"arg":"   ",
-                c->handle_cmd?' ':'*', c->description);
-        net_write_line(server, help_line);
-        c++;
-    }
-    return 0;
-}
-
 static int do_unknown_cmd(struct sd *server, int arg) {
-    printf("Unrecognized command\n");
-    net_write_line(server, "? Unrecognized command\n");
+    pkt_send_error(server, MAKE_ERROR(SUBSYS_PARSE, PARSE_ERR_UNKNOWN_CMD, 0),
+			"Unknown command");
     return 0;
 }
 
 static int do_error_cmd(struct sd *server, int arg) {
-    printf("Error\n");
-    net_write_line(server, "Error occurred\n");
+    pkt_send_error(server, MAKE_ERROR(SUBSYS_PARSE, PARSE_ERR_UNKNOWN, 0),
+			"An unknown error occurred");
     return 0;
 }
 
@@ -214,10 +197,6 @@ static int real_parse_cmd(struct sd *server, struct sd_cmd *cmd,
 }
 
 int parse_write_prompt(struct sd *server) {
-    if (server->parse_mode == PARSE_MODE_LINE)
-        net_write_line(server, NET_PROMPT);
-    else
-        fprintf(stderr, "Parse mode is %d\n", server->parse_mode);
     return 0;
 }
 

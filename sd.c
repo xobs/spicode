@@ -458,39 +458,35 @@ static int sd_net_set_current_sector(struct sd *state, int arg) {
 }
 
 static int sd_net_get_current_sector(struct sd *state, int arg) {
-	char msg[128];
-	snprintf(msg, sizeof(msg)-1, "Sector offset: %d\n", state->sd_sector);
-	net_write_line(state, msg);
+	pkt_send_buffer_offset(state, SECTOR_OFFSET, state->sd_sector);
 	return 0;
 }
 
 static int sd_net_get_cid(struct sd *state, int arg) {
 	int ret;
 	uint8_t cid[16];
-	char cid_line[256];
 	ret = sd_get_cid(state, cid);
-	if (ret)
+	if (ret) {
+		pkt_send_error(state, MAKE_ERROR(SUBSYS_SD, SD_ERR_CID, ret),
+				"Unable to request card CID");
 		return -1;
+	}
 
-	snprintf(cid_line, sizeof(cid_line)-1, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		cid[0], cid[1], cid[2], cid[3], cid[4], cid[5], cid[6], cid[7],
-		cid[8], cid[9], cid[10], cid[11], cid[12], cid[13], cid[14], cid[15]);
-	net_write_line(state, cid_line);
+	pkt_send_sd_cid(state, cid);
 	return 0;
 }
 
 static int sd_net_get_csd(struct sd *state, int arg) {
 	int ret;
 	uint8_t csd[16];
-	char csd_line[256];
 	ret = sd_get_csd(state, csd);
-	if (ret)
+	if (ret) {
+		pkt_send_error(state, MAKE_ERROR(SUBSYS_SD, SD_ERR_CSD, ret),
+				"Unable to request card CSD");
 		return -1;
+	}
 
-	snprintf(csd_line, sizeof(csd_line)-1, "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
-		csd[0], csd[1], csd[2], csd[3], csd[4], csd[5], csd[6], csd[7],
-		csd[8], csd[9], csd[10], csd[11], csd[12], csd[13], csd[14], csd[15]);
-	net_write_line(state, csd_line);
+	pkt_send_sd_csd(state, csd);
 	return 0;
 }
 
@@ -506,11 +502,7 @@ static int sd_net_set_buffer_offset(struct sd *state, int arg) {
 }
 
 static int sd_net_get_buffer_offset(struct sd *state, int arg) {
-	char line[256];
-	snprintf(line, sizeof(line)-1, "Buffer offset: %d\n",
-		 state->sd_write_buffer_offset);
-	net_write_line(state, line);
-	pkt_send_buffer_offset(state, 2, state->sd_write_buffer_offset);
+	pkt_send_buffer_offset(state, BUFFER_WRITE, state->sd_write_buffer_offset);
 	return 0;
 }
 
