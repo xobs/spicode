@@ -179,6 +179,8 @@ static int real_parse_cmd(struct sd *server, struct sd_cmd *cmd,
                     offset++;
                 cmd->arg = strtoul((char *)&line[offset], NULL, 0);
             }
+            else
+                cmd->arg = 0;
             cmd->syscmd = syscmd;
         }
     }
