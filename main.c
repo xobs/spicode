@@ -1,7 +1,10 @@
+#define _POSIX_C_SOURCE 20121221L
 #define DEBUG
 #include <stdio.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <strings.h>
+#include <time.h>
 #include <string.h>
 #include <ctype.h>
 #include <poll.h>
@@ -69,7 +72,7 @@ static void *clock_overflow_thread(void *arg) {
 	while (!server->should_exit) {
 		struct pollfd handles[1];
 
-		bzero(handles, sizeof(handles));
+		memset(handles, 0, sizeof(handles));
 		handles[0].fd     = fpga_overflow_fd(server);
 		handles[0].events = POLLPRI;
 
@@ -93,7 +96,7 @@ static void *data_available_thread(void *arg) {
 	while (!server->should_exit) {
 		struct pollfd handles[1];
 
-		bzero(handles, sizeof(handles));
+		memset(handles, 0, sizeof(handles));
 		handles[0].fd     = fpga_ready_fd(server);
 		handles[0].events = POLLPRI;
 
@@ -104,10 +107,15 @@ static void *data_available_thread(void *arg) {
 		}
 
 		while(fpga_data_avail(server)) {
-			fprintf(stderr, "Got FPGA data, draining...\n");
-			pkt_send_buffer_drain(server, PKT_BUFFER_DRAIN_START);
+			struct timespec ts;
+			uint16_t wr_data_count;
+			ts.tv_sec = 0;
+			ts.tv_nsec = 100000000;
+			i2c_get_buffer(server, 0x1c, 2, &wr_data_count);
+			wr_data_count = ntohs(wr_data_count);
+			fprintf(stderr, "Got FPGA data, draining (at least %d packets)...\n", wr_data_count);
+			nanosleep(&ts, NULL);
 			fpga_drain(server);
-			pkt_send_buffer_drain(server, PKT_BUFFER_DRAIN_STOP);
 			fprintf(stderr, "Done draining\n");
 		}
 	}
@@ -121,7 +129,7 @@ int main(int argc, char **argv) {
 	int ret;
 
 
-	bzero(&server, sizeof(server));
+	memset(&server, 0, sizeof(server));
 
 	ret = parse_init(&server);
 	if (ret < 0) {
@@ -177,7 +185,7 @@ int main(int argc, char **argv) {
 	while (1) {
 		struct pollfd handles[1];
 
-		bzero(handles, sizeof(handles));
+		memset(handles, 0, sizeof(handles));
 		handles[0].fd     = net_fd(&server);
 		handles[0].events = POLLIN | POLLHUP;
 
@@ -200,6 +208,7 @@ int main(int argc, char **argv) {
 
 			pkt_send_command(&server, &cmd, CMD_START);
 			ret = handle_net_command(&server, &cmd);
+			sleep(1);
 			pkt_send_command(&server, &cmd, CMD_END);
 
 			if (ret)
