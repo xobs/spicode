@@ -5,6 +5,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include "sd.h"
 #include "gpio.h"
 
@@ -15,6 +16,58 @@ static volatile char  *mem_8  = 0;
 static int *prev_mem_range = 0;
 
 #define GPIO_PATH "/sys/class/gpio"
+#define EXPORT_PATH GPIO_PATH "/export"
+#define UNEXPORT_PATH GPIO_PATH "/unexport"
+
+static int gpio_is_exported(int gpio) {
+	char gpio_path[256];
+	struct stat buf;
+	int ret;
+	snprintf(gpio_path, sizeof(gpio_path)-1, GPIO_PATH "/gpio%d/direction", gpio);
+	ret = stat(gpio_path, &buf);
+	if (ret == -1)
+		return 0;
+	return 1;
+}
+
+
+static int gpio_export_unexport(char *path, int gpio) {
+	int fd;
+	char str[16];
+	int bytes;
+
+	fd = open(path, O_WRONLY);
+	if (fd == -1) {
+		perror("Unable to find GPIO files -- /sys/class/gpio enabled?");
+		return -errno;
+	}
+
+	bytes = snprintf(str, sizeof(str)-1, "%d", gpio) + 1;
+
+	if (-1 == write(fd, str, bytes)) {
+		fprintf(stderr, "Unable to modify gpio%d: %s",
+			gpio, strerror(errno));
+		close(fd);
+		return -errno;
+	}
+
+	close(fd);
+	return 0;
+}
+
+int gpio_export(int gpio) {
+	if (gpio_is_exported(gpio))
+		return 0;
+	return gpio_export_unexport(EXPORT_PATH, gpio);
+}
+
+int gpio_unexport(int gpio) {
+	if (!gpio_is_exported(gpio))
+		return 0;
+	return gpio_export_unexport(UNEXPORT_PATH, gpio);
+}
+
+
 
 static int map_offset(long offset, int virtualized) {
     int *mem_range = (int *)(offset & ~0xFFFF);
@@ -113,14 +166,6 @@ volatile int gpio_get_bank(int bank) {
 		return -1;
 	}
 	return read_kernel_memory(base, 0, 4);
-}
-
-int gpio_export(int gpio) {
-	return 0;
-}
-
-int gpio_unexport(int gpio) {
-	return 0;
 }
 
 int gpio_set_direction(int gpio, int is_output) {
