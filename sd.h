@@ -166,6 +166,7 @@ struct sd {
 	pthread_t		fpga_data_available_thread;
 	pthread_mutex_t		fpga_overflow_mutex;
 	int			fpga_read;
+	uint32_t		fpga_ignore_blocks;
 
 
 	/* I2C (for use with the FPGA) */

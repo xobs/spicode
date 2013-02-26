@@ -218,7 +218,7 @@ int pkt_send_sd_response(struct sd *sd, uint8_t byte) {
  */
 int pkt_send_sd_cid(struct sd *sd, uint8_t cid[16]) {
 	char pkt[PKT_HEADER_SIZE+16];
-	pkt_set_header(sd, pkt, PACKET_SD_CID, PKT_HEADER_SIZE);
+	pkt_set_header(sd, pkt, PACKET_SD_CID, sizeof(pkt));
 	memcpy(pkt+PKT_HEADER_SIZE, cid, 16);
 	return net_write_data(sd, pkt, sizeof(pkt));
 }
@@ -250,7 +250,7 @@ int pkt_send_sd_csd(struct sd *sd, uint8_t csd[16]) {
 int pkt_send_buffer_offset(struct sd *sd, uint8_t buffertype, uint32_t offset) {
 	char pkt[PKT_HEADER_SIZE+1+4];
 	uint32_t real_offset;
-	pkt_set_header(sd, pkt, PACKET_BUFFER_OFFSET, sizeof(PKT_HEADER_SIZE));
+	pkt_set_header(sd, pkt, PACKET_BUFFER_OFFSET, sizeof(pkt));
 	real_offset = htonl(offset);
 	pkt[PKT_HEADER_SIZE+0] = buffertype;
 	memcpy(pkt+PKT_HEADER_SIZE+1, &real_offset, sizeof(real_offset));

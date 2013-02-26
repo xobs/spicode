@@ -109,12 +109,13 @@ static void *data_available_thread(void *arg) {
 		while(fpga_data_avail(server)) {
 			struct timespec ts;
 			uint16_t wr_data_count;
+			pkt_send_buffer_drain(server, PKT_BUFFER_DRAIN_START);
 			ts.tv_sec = 0;
-			ts.tv_nsec = 100000000;
+			ts.tv_nsec = 10000000;
+			nanosleep(&ts, NULL);
 			i2c_get_buffer(server, 0x1c, 2, &wr_data_count);
 			wr_data_count = ntohs(wr_data_count);
 			fprintf(stderr, "Got FPGA data, draining (at least %d packets)...\n", wr_data_count);
-			nanosleep(&ts, NULL);
 			fpga_drain(server);
 			fprintf(stderr, "Done draining\n");
 		}
@@ -202,13 +203,16 @@ int main(int argc, char **argv) {
 		if (handles[0].revents & POLLIN) {
 			int ret;
 			struct sd_cmd cmd;
+			struct timespec ts;
 			ret = get_net_command(&server, &cmd);
 			if (ret)
 				break;
 
 			pkt_send_command(&server, &cmd, CMD_START);
 			ret = handle_net_command(&server, &cmd);
-			sleep(1);
+			ts.tv_sec = 0;
+			ts.tv_nsec = 10000000;
+			nanosleep(&ts, NULL);
 			pkt_send_command(&server, &cmd, CMD_END);
 
 			if (ret)

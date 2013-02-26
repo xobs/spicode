@@ -122,7 +122,7 @@ static int my_usleep(long long usecs) {
 static int init_port(struct sd *state) {
         gpio_set_value(state->sd_power, SD_OFF);
 	CS_H();
-	my_usleep(10000);
+	my_usleep(300000);
         gpio_set_value(state->sd_power, SD_ON);
 	my_usleep(10000);
 	return 0;
@@ -700,6 +700,11 @@ int sd_reset(struct sd *state) {
 	state->sd_sector = 0;
 	INIT_PORT(state);				/* Initialize control port */
 	gpio_set_value(state->fpga_reset_clock, 0);
+	if (state->fpga_ignore_blocks)
+		i2c_set_buffer(state, 0x10,
+                        sizeof(state->fpga_ignore_blocks), 
+                        &state->fpga_ignore_blocks);
+
 	fpga_reset_ticks(state);
 	clock_gettime(CLOCK_MONOTONIC, &state->fpga_starttime);
 	for (n = 10; n; n--) rcvr_mmc(state, buf, 1);	/* 80 dummy clocks */

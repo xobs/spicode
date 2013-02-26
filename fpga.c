@@ -55,10 +55,10 @@ static int bank_select_pins[] = {
 
 
 static int set_ignore_blocks(struct sd *sd, int arg) {
-	uint8_t buffer[4];
-	arg = htonl(arg);
-	memcpy(buffer, &arg, sizeof(buffer));
-	return i2c_set_buffer(sd, 0x10, sizeof(buffer), buffer);
+	sd->fpga_ignore_blocks = htonl(arg);
+	return i2c_set_buffer(sd, 0x10,
+			sizeof(sd->fpga_ignore_blocks),
+			&sd->fpga_ignore_blocks);
 }
 
 int fpga_init(struct sd *sd) {
@@ -109,6 +109,16 @@ int fpga_init(struct sd *sd) {
 	return 0;
 }
 
+static int nsleep(int nsecs) {
+/*
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = nsecs;
+	nanosleep(&ts, NULL);
+*/
+	return 0;
+}
+
 int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	uint8_t data[sizeof(data_pins)/sizeof(*data_pins)];
 	static uint8_t last_data[8];
@@ -123,6 +133,7 @@ int fpga_get_new_sample(struct sd *st, uint8_t bytes[8]) {
 	for (bank=0; bank<4; bank++) {
 		gpio_set_value(bank_select_pins[0], !!(bank&1));
 		gpio_set_value(bank_select_pins[1], !!(bank&2));
+		nsleep(100000);
 		for (i=0; i<sizeof(data_pins)/sizeof(*data_pins); i++)
 			data[i] = gpio_get_value(data_pins[i]);
 		bytes[bank*2+0] = (data[0]<<0)
@@ -217,18 +228,23 @@ int fpga_read_data(struct sd *sd) {
 
 int fpga_drain(struct sd *sd) {
 	uint8_t pkt_buffer[MAX_PACKETS][8];
-	uint32_t overflow_times[16384];
+	uint16_t wr_data_count;
 	int packet_offset = 0;
 	int overflow_count = 0;
 	int current_packet;
 
+	/* Prevent the FPGA from filling the FIFO */
+	i2c_set_byte(sd, 2, 1);
+	i2c_get_buffer(sd, 0x1c, 2, &wr_data_count);
+	wr_data_count = ntohs(wr_data_count);
+	fprintf(stderr, "Should read %d packets\n", wr_data_count);
+
 	for (packet_offset = 0;
 	     packet_offset < MAX_PACKETS && fpga_data_avail(sd);
 	     packet_offset++) {
+		if (gpio_get_value(DATA_OVERFLOW_PIN))
+			overflow_count++;
 		fpga_get_new_sample(sd, pkt_buffer[packet_offset]);
-		if (gpio_get_value(DATA_OVERFLOW_PIN)) {
-			memcpy(&overflow_times[overflow_count++], pkt_buffer[packet_offset], sizeof(uint32_t));
-		}
 	}
 	fprintf(stderr, "Read %d packets\n", packet_offset);
 
@@ -237,12 +253,20 @@ int fpga_drain(struct sd *sd) {
 
 	if (overflow_count) {
 		char errmsg[512];
-		snprintf(errmsg, sizeof(errmsg)-1, "FPGA FIFO overflowed %d times\n", overflow_count);
+		snprintf(errmsg, sizeof(errmsg)-1,
+			"FPGA FIFO overflowed %d times\n", overflow_count);
 		printf(errmsg);
 		pkt_send_error(sd,
-			       MAKE_ERROR(SUBSYS_FPGA, FPGA_ERR_OVERFLOW, overflow_count),
+			       MAKE_ERROR(SUBSYS_FPGA,
+					FPGA_ERR_OVERFLOW,
+					overflow_count),
 			       errmsg);
 	}
+
+	/* Allow the FPGA to fill the FIFO */
+	pkt_send_buffer_drain(sd, PKT_BUFFER_DRAIN_STOP);
+	i2c_set_byte(sd, 2, 0);
+
 	return 0;
 }
 
