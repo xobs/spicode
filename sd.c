@@ -497,7 +497,7 @@ static int sd_net_reset_buffer(struct sd *state, int arg) {
 }
 
 static int sd_net_set_buffer_offset(struct sd *state, int arg) {
-	state->sd_write_buffer_offset = arg;
+	state->sd_write_buffer_offset = arg % sizeof(state->sd_write_bfr);
 	return 0;
 }
 
@@ -507,7 +507,10 @@ static int sd_net_get_buffer_offset(struct sd *state, int arg) {
 }
 
 static int sd_net_set_buffer_value(struct sd *state, int arg) {
-	state->sd_write_bfr[state->sd_write_buffer_offset++] = arg;
+	state->sd_write_bfr[state->sd_write_buffer_offset] = arg;
+	state->sd_write_buffer_offset++;
+	if (state->sd_write_buffer_offset >= sizeof(state->sd_write_bfr))
+		state->sd_write_buffer_offset %= sizeof(state->sd_write_bfr);
 	return 0;
 }
 
